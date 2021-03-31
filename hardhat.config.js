@@ -2,6 +2,7 @@
 require("dotenv/config")
 
 require("@nomiclabs/hardhat-etherscan")
+require('@nomiclabs/hardhat-truffle5')
 require("@nomiclabs/hardhat-solhint")
 require("@tenderly/hardhat-tenderly")
 require("@nomiclabs/hardhat-waffle")
