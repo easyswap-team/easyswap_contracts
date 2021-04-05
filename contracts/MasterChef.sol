@@ -55,6 +55,11 @@ contract MasterChef is Ownable {
         uint256 lastRewardBlock; // Last block number that SUSHIs distribution occurs.
         uint256 accSushiPerShare; // Accumulated SUSHIs per share, times 1e12. See below.
     }
+    //
+    struct Stage {
+        uint256 endBlock;
+        uint256 multiplier;
+    }
     // The SUSHI TOKEN!
     SushiToken public sushi;
     // Dev address.
@@ -63,8 +68,6 @@ contract MasterChef is Ownable {
     uint256 public bonusEndBlock;
     // SUSHI tokens created per block.
     uint256 public sushiPerBlock;
-    // Bonus muliplier for early sushi makers.
-    uint256 public constant BONUS_MULTIPLIER = 10;
     // The migrator contract. It has a lot of power. Can only be set through governance (owner).
     IMigratorChef public migrator;
     // Info of each pool.
@@ -75,6 +78,10 @@ contract MasterChef is Ownable {
     uint256 public totalAllocPoint = 0;
     // The block number when SUSHI mining starts.
     uint256 public startBlock;
+    //
+    Stage[] public stages;
+    //
+    event StageAdded(uint256 endBlock, uint256 multiplier);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(
@@ -93,7 +100,7 @@ contract MasterChef is Ownable {
         sushi = _sushi;
         devaddr = _devaddr;
         sushiPerBlock = _sushiPerBlock;
-        bonusEndBlock = _bonusEndBlock;
+        stages.push(Stage(_bonusEndBlock, 10));
         startBlock = _startBlock;
     }
 
@@ -156,22 +163,41 @@ contract MasterChef is Ownable {
         pool.lpToken = newLpToken;
     }
 
+    function addStage(uint256 _endBlock, uint256 _multiplier) public onlyOwner {
+        Stage memory lastStage = stages[stages.length.sub(1)];
+
+        require(_endBlock > lastStage.endBlock);
+        // require(_multiplier < lastStage.multiplier);
+
+        stages.push(Stage(_endBlock, _multiplier));
+        emit StageAdded(_endBlock, _multiplier);
+    }
+
     // Return reward multiplier over the given _from to _to block.
     function getMultiplier(uint256 _from, uint256 _to)
         public
         view
         returns (uint256)
     {
-        if (_to <= bonusEndBlock) {
-            return _to.sub(_from).mul(BONUS_MULTIPLIER);
-        } else if (_from >= bonusEndBlock) {
-            return _to.sub(_from);
-        } else {
-            return
-                bonusEndBlock.sub(_from).mul(BONUS_MULTIPLIER).add(
-                    _to.sub(bonusEndBlock)
-                );
+        uint256 multiplier = 0;
+
+        uint256 tmp_from = _from;
+        uint256 tmp_to;
+        Stage memory stage;
+
+        for (uint256 i = 0; i < stages.length; i++) {
+            stage = stages[i];
+            if (tmp_from > stage.endBlock) {
+                continue;
+            }
+            tmp_to = stage.endBlock < _to ? stage.endBlock : _to;
+            multiplier = multiplier.add(tmp_to.sub(tmp_from).mul(stage.multiplier));
+            if (tmp_to == _to)
+                break;
+            tmp_from = tmp_to;
         }
+
+        return multiplier;
     }
 
     // View function to see pending SUSHIs on frontend.

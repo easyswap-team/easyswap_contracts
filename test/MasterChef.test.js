@@ -1,6 +1,7 @@
 const { ethers } = require("hardhat")
 const { expect } = require("chai")
 const { time } = require("./utilities")
+const { BN } = require("bn.js")
 
 describe("MasterChef", function () {
   before(async function () {
@@ -262,6 +263,63 @@ describe("MasterChef", function () {
       await this.chef.connect(this.alice).deposit(0, "0", { from: this.alice.address })
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("0")
       expect(await this.sushi.balanceOf(this.alice.address)).to.equal("10600")
+    })
+
+    context('Multiplier stages test ', function () {
+      beforeEach(async function () {
+        this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "100", "500", "600")
+        await this.sushi.transferOwnership(this.chef.address)
+        await this.lp.connect(this.alice).approve(this.chef.address, "1000", { from: this.alice.address })
+        await this.chef.add("1", this.lp.address, true)
+
+        await this.chef.addStage("700", "5")
+        await this.chef.addStage("800", "1")
+      })
+
+      it('test stages', async function () {
+        stage_0 = await this.chef.stages(0)
+        stage_1 = await this.chef.stages(1)
+        stage_2 = await this.chef.stages(2)
+
+        expect(stage_0.endBlock).to.equal("600")
+        expect(stage_0.multiplier).to.equal("10")
+
+        expect(stage_1.endBlock).to.equal("700")
+        expect(stage_1.multiplier).to.equal("5")
+
+        expect(stage_2.endBlock).to.equal("800")
+        expect(stage_2.multiplier).to.equal("1")
+      })
+
+      it('test getMultiplier()', async function () {
+        expect(await this.chef.getMultiplier(500, 600)).to.equal("1000")
+        expect(await this.chef.getMultiplier(600, 700)).to.equal("500")
+        expect(await this.chef.getMultiplier(700, 800)).to.equal("100")
+
+        expect(await this.chef.getMultiplier(500, 520)).to.equal("200")
+        expect(await this.chef.getMultiplier(580, 600)).to.equal("200")
+
+        expect(await this.chef.getMultiplier(600, 620)).to.equal("100")
+        expect(await this.chef.getMultiplier(680, 700)).to.equal("100")
+
+        expect(await this.chef.getMultiplier(700, 720)).to.equal("20")
+        expect(await this.chef.getMultiplier(780, 800)).to.equal("20")
+
+        expect(await this.chef.getMultiplier(590, 605)).to.equal("125")
+      })
+
+      it('test pending', async function() {
+        // Alice deposits 10 LPs at block 590
+        await time.advanceBlockTo("589")
+        await this.chef.connect(this.alice).deposit(0, "10", { from: this.alice.address })
+        // At block 605, she should have 10*100*10 + 5*100*5 = 12500 pending.
+        await time.advanceBlockTo("605")
+        expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("12500")
+        // At block 606, Alice withdraws all pending rewards and should get 13000.
+        await this.chef.connect(this.alice).deposit(0, "0", { from: this.alice.address })
+        expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("0")
+        expect(await this.sushi.balanceOf(this.alice.address)).to.equal("13000")
+      })
     })
   })
 })
