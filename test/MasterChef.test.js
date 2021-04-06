@@ -1,6 +1,5 @@
 const { ethers } = require("hardhat")
 const { expect } = require("chai")
-const { time } = require("./utilities")
 const { BN } = require("bn.js")
 
 describe("MasterChef", function () {
@@ -12,7 +11,7 @@ describe("MasterChef", function () {
     this.dev = this.signers[3]
     this.minter = this.signers[4]
 
-    this.MasterChef = await ethers.getContractFactory("MasterChef")
+    this.MasterChef = await ethers.getContractFactory("MasterChefMock")
     this.SushiToken = await ethers.getContractFactory("SushiToken")
     this.ERC20Mock = await ethers.getContractFactory("ERC20Mock", this.minter)
   })
@@ -94,7 +93,7 @@ describe("MasterChef", function () {
     it("should give out SUSHIs only after farming time", async function () {
       // 100 per block farming rate starting at block 100 with bonus until block 1000
       this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "100", "100", "1000", "10")
-      await this.chef.deployed()
+      //await this.chef.deployed()
 
       await this.sushi.transferOwnership(this.chef.address)
 
@@ -102,24 +101,24 @@ describe("MasterChef", function () {
 
       await this.lp.connect(this.bob).approve(this.chef.address, "1000")
       await this.chef.connect(this.bob).deposit(0, "100")
-      await time.advanceBlockTo("89")
+      await this.chef.setCurrentBlock("90")
 
       await this.chef.connect(this.bob).deposit(0, "0") // block 90
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("0")
-      await time.advanceBlockTo("94")
+      await this.chef.setCurrentBlock("95")
 
       await this.chef.connect(this.bob).deposit(0, "0") // block 95
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("0")
-      await time.advanceBlockTo("99")
+      await this.chef.setCurrentBlock("100")
 
       await this.chef.connect(this.bob).deposit(0, "0") // block 100
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("0")
-      await time.advanceBlockTo("100")
+      await this.chef.setCurrentBlock("101")
 
       await this.chef.connect(this.bob).deposit(0, "0") // block 101
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("1000")
 
-      await time.advanceBlockTo("104")
+      await this.chef.setCurrentBlock("105")
       await this.chef.connect(this.bob).deposit(0, "0") // block 105
 
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("5000")
@@ -134,17 +133,17 @@ describe("MasterChef", function () {
       await this.sushi.transferOwnership(this.chef.address)
       await this.chef.add("100", this.lp.address, true)
       await this.lp.connect(this.bob).approve(this.chef.address, "1000")
-      await time.advanceBlockTo("199")
+      await this.chef.setCurrentBlock("200")
       expect(await this.sushi.totalSupply()).to.equal("0")
-      await time.advanceBlockTo("204")
+      await this.chef.setCurrentBlock("205")
       expect(await this.sushi.totalSupply()).to.equal("0")
-      await time.advanceBlockTo("209")
+      await this.chef.setCurrentBlock("210")
       await this.chef.connect(this.bob).deposit(0, "10") // block 210
       expect(await this.sushi.totalSupply()).to.equal("0")
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("0")
       expect(await this.sushi.balanceOf(this.dev.address)).to.equal("0")
       expect(await this.lp.balanceOf(this.bob.address)).to.equal("990")
-      await time.advanceBlockTo("219")
+      await this.chef.setCurrentBlock("220")
       await this.chef.connect(this.bob).withdraw(0, "10") // block 220
       expect(await this.sushi.totalSupply()).to.equal("11000")
       expect(await this.sushi.balanceOf(this.bob.address)).to.equal("10000")
@@ -168,18 +167,18 @@ describe("MasterChef", function () {
         from: this.carol.address,
       })
       // Alice deposits 10 LPs at block 310
-      await time.advanceBlockTo("309")
+      await this.chef.setCurrentBlock("310")
       await this.chef.connect(this.alice).deposit(0, "10", { from: this.alice.address })
       // Bob deposits 20 LPs at block 314
-      await time.advanceBlockTo("313")
+      await this.chef.setCurrentBlock("314")
       await this.chef.connect(this.bob).deposit(0, "20", { from: this.bob.address })
       // Carol deposits 30 LPs at block 318
-      await time.advanceBlockTo("317")
+      await this.chef.setCurrentBlock("318")
       await this.chef.connect(this.carol).deposit(0, "30", { from: this.carol.address })
       // Alice deposits 10 more LPs at block 320. At this point:
       //   Alice should have: 4*1000 + 4*1/3*1000 + 2*1/6*1000 = 5666
       //   MasterChef should have the remaining: 10000 - 5666 = 4334
-      await time.advanceBlockTo("319")
+      await this.chef.setCurrentBlock("320")
       await this.chef.connect(this.alice).deposit(0, "10", { from: this.alice.address })
       expect(await this.sushi.totalSupply()).to.equal("11000")
       expect(await this.sushi.balanceOf(this.alice.address)).to.equal("5666")
@@ -189,7 +188,7 @@ describe("MasterChef", function () {
       expect(await this.sushi.balanceOf(this.dev.address)).to.equal("1000")
       // Bob withdraws 5 LPs at block 330. At this point:
       //   Bob should have: 4*2/3*1000 + 2*2/6*1000 + 10*2/7*1000 = 6190
-      await time.advanceBlockTo("329")
+      await this.chef.setCurrentBlock("330")
       await this.chef.connect(this.bob).withdraw(0, "5", { from: this.bob.address })
       expect(await this.sushi.totalSupply()).to.equal("22000")
       expect(await this.sushi.balanceOf(this.alice.address)).to.equal("5666")
@@ -200,11 +199,11 @@ describe("MasterChef", function () {
       // Alice withdraws 20 LPs at block 340.
       // Bob withdraws 15 LPs at block 350.
       // Carol withdraws 30 LPs at block 360.
-      await time.advanceBlockTo("339")
+      await this.chef.setCurrentBlock("340")
       await this.chef.connect(this.alice).withdraw(0, "20", { from: this.alice.address })
-      await time.advanceBlockTo("349")
+      await this.chef.setCurrentBlock("350")
       await this.chef.connect(this.bob).withdraw(0, "15", { from: this.bob.address })
-      await time.advanceBlockTo("359")
+      await this.chef.setCurrentBlock("360")
       await this.chef.connect(this.carol).withdraw(0, "30", { from: this.carol.address })
       expect(await this.sushi.totalSupply()).to.equal("55000")
       expect(await this.sushi.balanceOf(this.dev.address)).to.equal("5000")
@@ -229,19 +228,19 @@ describe("MasterChef", function () {
       // Add first LP to the pool with allocation 1
       await this.chef.add("10", this.lp.address, true)
       // Alice deposits 10 LPs at block 410
-      await time.advanceBlockTo("409")
+      await this.chef.setCurrentBlock("410")
       await this.chef.connect(this.alice).deposit(0, "10", { from: this.alice.address })
       // Add LP2 to the pool with allocation 2 at block 420
-      await time.advanceBlockTo("419")
+      await this.chef.setCurrentBlock("420")
       await this.chef.add("20", this.lp2.address, true)
       // Alice should have 10*1000 pending reward
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("10000")
       // Bob deposits 10 LP2s at block 425
-      await time.advanceBlockTo("424")
+      await this.chef.setCurrentBlock("425")
       await this.chef.connect(this.bob).deposit(1, "5", { from: this.bob.address })
       // Alice should have 10000 + 5*1/3*1000 = 11666 pending reward
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("11666")
-      await time.advanceBlockTo("430")
+      await this.chef.setCurrentBlock("430")
       // At block 430. Bob should get 5*2/3*1000 = 3333. Alice should get ~1666 more.
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("13333")
       expect(await this.chef.pendingSushi(1, this.bob.address)).to.equal("3333")
@@ -258,17 +257,18 @@ describe("MasterChef", function () {
       await this.chef.addStage("800", "1")
 
       // Alice deposits 10 LPs at block 590
-      await time.advanceBlockTo("589")
+      await this.chef.setCurrentBlock("590")
       await this.chef.connect(this.alice).deposit(0, "10", { from: this.alice.address })
       // At block 605, she should have 10*100*10 + 5*100*5 = 12500 pending.
-      await time.advanceBlockTo("605")
+      await this.chef.setCurrentBlock("605")
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("12500")
       // At block 606, Alice withdraws all pending rewards and should get 13000.
+      await this.chef.setCurrentBlock("606")
       await this.chef.connect(this.alice).deposit(0, "0", { from: this.alice.address })
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("0")
       expect(await this.sushi.balanceOf(this.alice.address)).to.equal("13000")
       // At block 900, she should have 94*100*5 + 100*100*1 + 100*100*0 = 57000 pending.
-      await time.advanceBlockTo("900")
+      await this.chef.setCurrentBlock("900")
       expect(await this.chef.pendingSushi(0, this.alice.address)).to.equal("57000")
     })
 

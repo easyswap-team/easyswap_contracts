@@ -41,7 +41,7 @@ describe("Migrator", function () {
 
     this.lp2 = await this.UniswapV2Pair.attach((await pair2.wait()).events[0].args.pair)
 
-    this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "1000", "0", "100000")
+    this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "1000", "0", "100000", "10")
     await this.chef.deployed()
 
     this.migrator = await this.Migrator.deploy(this.chef.address, this.factory1.address, this.factory2.address, "0")

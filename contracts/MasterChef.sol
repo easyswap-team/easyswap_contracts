@@ -120,7 +120,7 @@ contract MasterChef is Ownable {
             massUpdatePools();
         }
         uint256 lastRewardBlock =
-            block.number > startBlock ? block.number : startBlock;
+            _getCurrentBlock() > startBlock ? _getCurrentBlock() : startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(
             PoolInfo({
@@ -164,7 +164,7 @@ contract MasterChef is Ownable {
         pool.lpToken = newLpToken;
     }
 
-    // Add new stage with own multiplier.
+    // Add new stage with its own multiplier.
     function addStage(uint256 _endBlock, uint256 _multiplier) public onlyOwner {
         Stage memory lastStage = stages[stages.length.sub(1)];
 
@@ -191,11 +191,11 @@ contract MasterChef is Ownable {
 
         for (uint256 i = 0; i < stages.length; i++) {
             stage = stages[i];
-            if (tmp_from > stage.endBlock) {
+            if (tmp_from > stage.endBlock)
                 continue;
-            }
             tmp_to = stage.endBlock < _to ? stage.endBlock : _to;
-            multiplier = multiplier.add(tmp_to.sub(tmp_from).mul(stage.multiplier));
+            multiplier =
+                multiplier.add(tmp_to.sub(tmp_from).mul(stage.multiplier));
             if (tmp_to == _to)
                 break;
             tmp_from = tmp_to;
@@ -214,9 +214,9 @@ contract MasterChef is Ownable {
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accSushiPerShare = pool.accSushiPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
-        if (block.number > pool.lastRewardBlock && lpSupply != 0) {
+        if (_getCurrentBlock() > pool.lastRewardBlock && lpSupply != 0) {
             uint256 multiplier =
-                getMultiplier(pool.lastRewardBlock, block.number);
+                getMultiplier(pool.lastRewardBlock, _getCurrentBlock());
             uint256 sushiReward =
                 multiplier.mul(sushiPerBlock).mul(pool.allocPoint).div(
                     totalAllocPoint
@@ -239,15 +239,15 @@ contract MasterChef is Ownable {
     // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
+        if (_getCurrentBlock() <= pool.lastRewardBlock) {
             return;
         }
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (lpSupply == 0) {
-            pool.lastRewardBlock = block.number;
+            pool.lastRewardBlock = _getCurrentBlock();
             return;
         }
-        uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+        uint256 multiplier = getMultiplier(pool.lastRewardBlock, _getCurrentBlock());
         uint256 sushiReward =
             multiplier.mul(sushiPerBlock).mul(pool.allocPoint).div(
                 totalAllocPoint
@@ -257,7 +257,7 @@ contract MasterChef is Ownable {
         pool.accSushiPerShare = pool.accSushiPerShare.add(
             sushiReward.mul(1e12).div(lpSupply)
         );
-        pool.lastRewardBlock = block.number;
+        pool.lastRewardBlock = _getCurrentBlock();
     }
 
     // Deposit LP tokens to MasterChef for SUSHI allocation.
@@ -307,6 +307,11 @@ contract MasterChef is Ownable {
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
+    }
+
+    // Returns block.number, overridable for test purposes.
+    function _getCurrentBlock() virtual internal view returns (uint256) {
+        return block.number;
     }
 
     // Safe sushi transfer function, just in case if rounding error causes pool to not have enough SUSHIs.

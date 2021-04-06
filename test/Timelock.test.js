@@ -62,7 +62,7 @@ describe("Timelock", function () {
   it("should also work with MasterChef", async function () {
     this.lp1 = await this.ERC20Mock.deploy("LPToken", "LP", "10000000000")
     this.lp2 = await this.ERC20Mock.deploy("LPToken", "LP", "10000000000")
-    this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "1000", "0", "1000")
+    this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "1000", "0", "1000", "10")
     await this.sushi.transferOwnership(this.chef.address)
     await this.chef.add("100", this.lp1.address, true)
     await this.chef.transferOwnership(this.timelock.address)
