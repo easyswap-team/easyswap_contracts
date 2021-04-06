@@ -55,7 +55,7 @@ contract MasterChef is Ownable {
         uint256 lastRewardBlock; // Last block number that SUSHIs distribution occurs.
         uint256 accSushiPerShare; // Accumulated SUSHIs per share, times 1e12. See below.
     }
-    //
+    // Info of each multiplier stage.
     struct Stage {
         uint256 endBlock;
         uint256 multiplier;
@@ -78,7 +78,7 @@ contract MasterChef is Ownable {
     uint256 public totalAllocPoint = 0;
     // The block number when SUSHI mining starts.
     uint256 public startBlock;
-    //
+    // Array of stages
     Stage[] public stages;
     //
     event StageAdded(uint256 endBlock, uint256 multiplier);
@@ -95,13 +95,14 @@ contract MasterChef is Ownable {
         address _devaddr,
         uint256 _sushiPerBlock,
         uint256 _startBlock,
-        uint256 _bonusEndBlock
+        uint256 _firstStageEndBlock,
+        uint256 _firstStageMultiplier
     ) public {
         sushi = _sushi;
         devaddr = _devaddr;
         sushiPerBlock = _sushiPerBlock;
-        stages.push(Stage(_bonusEndBlock, 10));
         startBlock = _startBlock;
+        stages.push(Stage(_firstStageEndBlock, _firstStageMultiplier));
     }
 
     function poolLength() external view returns (uint256) {
@@ -163,11 +164,11 @@ contract MasterChef is Ownable {
         pool.lpToken = newLpToken;
     }
 
+    // Add new stage with own multiplier.
     function addStage(uint256 _endBlock, uint256 _multiplier) public onlyOwner {
         Stage memory lastStage = stages[stages.length.sub(1)];
 
         require(_endBlock > lastStage.endBlock);
-        // require(_multiplier < lastStage.multiplier);
 
         stages.push(Stage(_endBlock, _multiplier));
         emit StageAdded(_endBlock, _multiplier);
