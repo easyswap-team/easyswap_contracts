@@ -4,18 +4,18 @@ const { ZERO_ADDRESS } = constants;
 
 const {shouldBehaveLikeERC20} = require('./ERC20.behavior');
 
-const EasyToken = artifacts.require('EasyToken');
+const EasySwapMakerToken = artifacts.require('EasySwapMakerToken');
 
 contract('ERC20', function (accounts) {
   const [ initialHolder, recipient, anotherAccount ] = accounts;
 
-  const name = 'Easy Token';
+  const name = 'EasySwap Maker';
   const symbol = 'ESM';
 
   const initialSupply = new BN(100);
 
   beforeEach(async function () {
-    this.token = await EasyToken.new();
+    this.token = await EasySwapMakerToken.new();
     this.token.addMinter(initialHolder)
     this.token.mint(initialHolder, initialSupply);
   });
@@ -195,14 +195,14 @@ contract('ERC20', function (accounts) {
 
   describe('minters', function () {
     const amount = new BN(50);
-    
+
     describe('addMinter method',function(){
-    
+
     it('onlyOwner method', async function () {
       await expectRevert(
       this.token.addMinter(anotherAccount, {from: anotherAccount}), 'Ownable: caller is not the owner',);
       });
-    
+
     it('addMinter', async function () {
       await this.token.addMinter(anotherAccount)
       await this.token.mint(anotherAccount,amount,{from: anotherAccount})
@@ -211,19 +211,19 @@ contract('ERC20', function (accounts) {
     });
 
     describe('delMinter method',function(){
-      
+
       it('onlyOwner method', async function () {
         await expectRevert(
           this.token.delMinter(anotherAccount, {from: anotherAccount}), 'Ownable: caller is not the owner',);
         });
-      
+
       it('delMinter', async function () {
         await this.token.delMinter(anotherAccount)
         await expectRevert(this.token.mint(anotherAccount, amount, {from: anotherAccount}), 'Minting: caller is not the minter');
       });
     });
   });
-  
+
   describe('mint', function () {
     const amount = new BN(50);
     it('rejects a null account', async function () {

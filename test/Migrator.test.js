@@ -12,8 +12,8 @@ describe("Migrator", function () {
     this.UniswapV2Factory = await ethers.getContractFactory("UniswapV2Factory")
     this.UniswapV2Pair = await ethers.getContractFactory("UniswapV2Pair")
     this.ERC20Mock = await ethers.getContractFactory("ERC20Mock", this.minter)
-    this.SushiToken = await ethers.getContractFactory("SushiToken")
-    this.MasterChef = await ethers.getContractFactory("MasterChef")
+    this.EasySwapMakerToken = await ethers.getContractFactory("EasySwapMakerToken")
+    this.EasySwapRewardPool = await ethers.getContractFactory("EasySwapRewardPool")
     this.Migrator = await ethers.getContractFactory("Migrator")
   })
 
@@ -24,8 +24,8 @@ describe("Migrator", function () {
     this.factory2 = await this.UniswapV2Factory.deploy(this.alice.address)
     await this.factory2.deployed()
 
-    this.sushi = await this.SushiToken.deploy()
-    await this.sushi.deployed()
+    this.esm = await this.EasySwapMakerToken.deploy()
+    await this.esm.deployed()
 
     this.weth = await this.ERC20Mock.deploy("WETH", "WETH", "100000000")
     await this.weth.deployed()
@@ -41,15 +41,15 @@ describe("Migrator", function () {
 
     this.lp2 = await this.UniswapV2Pair.attach((await pair2.wait()).events[0].args.pair)
 
-    this.chef = await this.MasterChef.deploy(this.sushi.address, this.dev.address, "1000", "0", "100000", "10")
-    await this.chef.deployed()
+    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "1000", "0", "100000", "10")
+    await this.rewardPool.deployed()
 
-    this.migrator = await this.Migrator.deploy(this.chef.address, this.factory1.address, this.factory2.address, "0")
+    this.migrator = await this.Migrator.deploy(this.rewardPool.address, this.factory1.address, this.factory2.address, "0")
     await this.migrator.deployed()
 
-    await this.sushi.transferOwnership(this.chef.address)
+    await this.esm.transferOwnership(this.rewardPool.address)
 
-    await this.chef.add("100", this.lp1.address, true)
+    await this.rewardPool.add("100", this.lp1.address, true)
   })
 
   it("should do the migration successfully", async function () {
@@ -62,20 +62,20 @@ describe("Migrator", function () {
     await this.token.connect(this.minter).transfer(this.lp1.address, "100000", { from: this.minter.address })
     await this.weth.connect(this.minter).transfer(this.lp1.address, "5000", { from: this.minter.address })
     await this.lp1.sync()
-    await this.lp1.connect(this.minter).approve(this.chef.address, "100000000000", { from: this.minter.address })
-    await this.chef.connect(this.minter).deposit("0", "2000000", { from: this.minter.address })
-    expect(await this.lp1.balanceOf(this.chef.address), "2000000")
-    await expect(this.chef.migrate(0)).to.be.revertedWith("migrate: no migrator")
+    await this.lp1.connect(this.minter).approve(this.rewardPool.address, "100000000000", { from: this.minter.address })
+    await this.rewardPool.connect(this.minter).deposit("0", "2000000", { from: this.minter.address })
+    expect(await this.lp1.balanceOf(this.rewardPool.address), "2000000")
+    await expect(this.rewardPool.migrate(0)).to.be.revertedWith("migrate: no migrator")
 
-    await this.chef.setMigrator(this.migrator.address)
-    await expect(this.chef.migrate(0)).to.be.revertedWith("migrate: bad")
+    await this.rewardPool.setMigrator(this.migrator.address)
+    await expect(this.rewardPool.migrate(0)).to.be.revertedWith("migrate: bad")
 
     await this.factory2.setMigrator(this.migrator.address)
-    await this.chef.migrate(0)
-    expect(await this.lp1.balanceOf(this.chef.address)).to.equal("0")
-    expect(await this.lp2.balanceOf(this.chef.address)).to.equal("2000000")
+    await this.rewardPool.migrate(0)
+    expect(await this.lp1.balanceOf(this.rewardPool.address)).to.equal("0")
+    expect(await this.lp2.balanceOf(this.rewardPool.address)).to.equal("2000000")
 
-    await this.chef.connect(this.minter).withdraw("0", "2000000", { from: this.minter.address })
+    await this.rewardPool.connect(this.minter).withdraw("0", "2000000", { from: this.minter.address })
     await this.lp2.connect(this.minter).transfer(this.lp2.address, "2000000", { from: this.minter.address })
     await this.lp2.burn(this.bob.address)
     expect(await this.token.balanceOf(this.bob.address)).to.equal("9033718")
