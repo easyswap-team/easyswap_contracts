@@ -179,10 +179,13 @@ contract MasterChef is Ownable {
         view
         returns (uint256)
     {
+        assert(_from <= _to);
+
         uint256 multiplier = 0;
 
         uint256 tmp_from = _from;
         uint256 tmp_to;
+
         Stage memory stage;
 
         for (uint256 i = 0; i < stages.length; i++) {
