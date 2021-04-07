@@ -193,6 +193,37 @@ contract('ERC20', function (accounts) {
     });
   });
 
+  describe('minters', function () {
+    const amount = new BN(50);
+    
+    describe('addMinter method',function(){
+    
+    it('onlyOwner method', async function () {
+      await expectRevert(
+      this.token.addMinter(anotherAccount, {from: anotherAccount}), 'Ownable: caller is not the owner',);
+      });
+    
+    it('addMinter', async function () {
+      await this.token.addMinter(anotherAccount)
+      await this.token.mint(anotherAccount,amount,{from: anotherAccount})
+      expect(await this.token.balanceOf(anotherAccount)).to.be.bignumber.equal(amount);
+      });
+    });
+
+    describe('delMinter method',function(){
+      
+      it('onlyOwner method', async function () {
+        await expectRevert(
+          this.token.delMinter(anotherAccount, {from: anotherAccount}), 'Ownable: caller is not the owner',);
+        });
+      
+      it('delMinter', async function () {
+        await this.token.delMinter(anotherAccount)
+        await expectRevert(this.token.mint(anotherAccount, amount, {from: anotherAccount}), 'Minting: caller is not the minter');
+      });
+    });
+  });
+  
   describe('mint', function () {
     const amount = new BN(50);
     it('rejects a null account', async function () {
