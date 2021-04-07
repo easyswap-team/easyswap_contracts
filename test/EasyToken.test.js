@@ -16,6 +16,7 @@ contract('ERC20', function (accounts) {
 
   beforeEach(async function () {
     this.token = await EasyToken.new();
+    this.token.addMinter(initialHolder)
     this.token.mint(initialHolder, initialSupply);
   });
 
@@ -200,9 +201,9 @@ contract('ERC20', function (accounts) {
       );
     });
 
-    it('onlyOwner method', async function () {
+    it('onlyMinter method', async function () {
       await expectRevert(
-        this.token.mint(ZERO_ADDRESS, amount, {from: anotherAccount}), 'Ownable: caller is not the owner'
+        this.token.mint(ZERO_ADDRESS, amount, {from: anotherAccount}), 'Minting: caller is not the minter'
       );
     });
 

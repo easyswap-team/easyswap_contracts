@@ -21,7 +21,7 @@ contract EasyToken is ERC20, Ownable {
         minters[_address] = false;
     }
     modifier onlyMinter() {
-        require(minters[msg.sender],"Ownable: caller is not the owner");
+        require(minters[msg.sender],"Minting: caller is not the minter");
         _;
     }
 }
