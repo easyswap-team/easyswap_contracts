@@ -34,7 +34,7 @@
     "mainnet:export": "hardhat --network mainnet export --export exports/mainnet.json",
     "bsc-testnet:deploy": "hardhat --network bsc-testnet deploy",
     "bsc-testnet:verify": "hardhat --network bsc-testnet etherscan-verify --solc-input",
-    "bsc-testnet:export": "hardhat --network bsc-testnet export --export exports/mainnet.json",
+    "bsc-testnet:export": "hardhat --network bsc-testnet export --export exports/bsc-testnet.json",
     "ropsten:deploy": "hardhat --network ropsten deploy",
     "ropsten:verify": "hardhat --network ropsten etherscan-verify --solc-input",
     "ropsten:export": "hardhat --network ropsten export --export exports/ropsten.json",
