@@ -1,0 +1,58 @@
+yarn run v1.22.10
+$ /home/lxzrv/WorkDir/OnGrid/easyswap_contracts/node_modules/.bin/hardhat --network bsc-testnet deploy
+Compiling 51 files with 0.6.12
+contracts/SushiToken.sol:23:5: Warning: Documentation tag on non-public state variables will be disallowed in 0.7.0. You will need to use the @dev tag explicitly.
+    /// @notice A record of each accounts delegate
+    ^--------------------------------------------^
+
+contracts/governance/Timelock.sol:122:51: Warning: Using ".value(...)" is deprecated. Use "{value: ...}" instead.
+        (bool success, bytes memory returnData) = target.call.value(value)(callData);
+                                                  ^---------------^
+
+contracts/SushiRoll.sol:80:9: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+        uint256 deadline
+        ^--------------^
+
+contracts/mocks/RewarderBrokenMock.sol:13:28: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+    function pendingTokens(uint256 pid, address user, uint256 sushiAmount ...
+                           ^---------^
+
+contracts/mocks/RewarderBrokenMock.sol:13:41: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+ ... unction pendingTokens(uint256 pid, address user, uint256 sushiAmount) override ext ...
+                                        ^----------^
+
+contracts/mocks/RewarderBrokenMock.sol:13:55: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+ ... gTokens(uint256 pid, address user, uint256 sushiAmount) override external returns (IERC20 ...
+                                        ^-----------------^
+
+contracts/mocks/RewarderBrokenMock.sol:13:103: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+ ... Amount) override external returns (IERC20[] memory rewardTokens, uint256[] memory rewardAmounts){
+                                        ^--------------------------^
+
+contracts/mocks/RewarderBrokenMock.sol:13:133: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+ ... rns (IERC20[] memory rewardTokens, uint256[] memory rewardAmounts){
+                                        ^----------------------------^
+
+contracts/mocks/RewarderMock.sol:30:28: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+    function pendingTokens(uint256 pid, address user, uint256 sushiAmount ...
+                           ^---------^
+
+contracts/mocks/RewarderMock.sol:30:41: Warning: Unused function parameter. Remove or comment out the variable name to silence this warning.
+ ... unction pendingTokens(uint256 pid, address user, uint256 sushiAmount) override ext ...
+                                        ^----------^
+
+Compilation finished successfully
+Creating Typechain artifacts in directory types for target ethers-v5
+Successfully generated Typechain artifacts!
+reusing "UniswapV2Factory" at 0xed926313B04Cb206eA317583FA41B1d9EaDd8117
+here
+reusing "UniswapV2Router02" at 0x84F9A7b8ce8eeF993bFEF5534E49FEfDF0dEc77d
+deploying "EasySwapMakerToken" (tx: 0xad2eed411bc82280427d91af86dd01ffcba69d41123c3c940b02d586e27111eb)...: deployed at 0x605341403C8177f3F446fe049D7d5C5714316f94 with 916660 gas
+Current block number is: 7764851
+0 stage endBlock: 7793651, multiplier : 100
+1 stage endBlock: 7822451, multiplier : 10
+2 stage endBlock: 7851251, multiplier : 1
+deploying "EasySwapRewardPool" (tx: 0xb6504c83f1d80e4e21e054347d6330df6a0b132414b37843b41e3cafbc018964)...: deployed at 0x2743E0Ea86b0c6C5F7588445206058B7f10f8C0C with 1943544 gas
+Transfer Esm Ownership to Chef
+Transfer ownership of RewardPool to dev
+Done in 85.81s.

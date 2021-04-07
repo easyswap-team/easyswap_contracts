@@ -5,8 +5,9 @@ module.exports = async function ({ ethers, deployments, getNamedAccounts }) {
 
   const esm = await ethers.getContract("EasySwapMakerToken")
 
-  const deploymentBlockNumber = await ethers.provider.getBlockNumber()
+  const esmPerBlock = "1000000000000000000" // 1e18
 
+  const deploymentBlockNumber = await ethers.provider.getBlockNumber()
   console.log(`Current block number is: ${deploymentBlockNumber}`)
 
   stage0EndBlock = deploymentBlockNumber + (28800)
@@ -23,7 +24,7 @@ module.exports = async function ({ ethers, deployments, getNamedAccounts }) {
 
   const { address } = await deploy("EasySwapRewardPool", {
     from: deployer,
-    args: [esm.address, dev, "1000000000000000000000", deploymentBlockNumber, stage0EndBlock, stage0Multiplier],
+    args: [esm.address, dev, esmPerBlock, deploymentBlockNumber, stage0EndBlock, stage0Multiplier],
     log: true,
     deterministicDeployment: false
   })
