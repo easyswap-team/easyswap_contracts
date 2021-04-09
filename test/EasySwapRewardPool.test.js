@@ -18,6 +18,7 @@ describe("EasySwapRewardPool", function () {
 
   beforeEach(async function () {
     this.esm = await this.EasySwapMakerToken.deploy()
+
     await this.esm.deployed()
   })
 
@@ -25,7 +26,7 @@ describe("EasySwapRewardPool", function () {
     this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "1000", "0", "1000", "10")
     await this.rewardPool.deployed()
 
-    await this.esm.transferOwnership(this.rewardPool.address)
+    await this.esm.addMinter(this.rewardPool.address)
 
     const esm = await this.rewardPool.esm()
     const devaddr = await this.rewardPool.devaddr()
@@ -33,7 +34,7 @@ describe("EasySwapRewardPool", function () {
 
     expect(esm).to.equal(this.esm.address)
     expect(devaddr).to.equal(this.dev.address)
-    expect(owner).to.equal(this.rewardPool.address)
+    expect(owner).to.equal(this.signers[0].address)
   })
 
   it("should allow dev and only dev to update dev", async function () {
@@ -95,7 +96,7 @@ describe("EasySwapRewardPool", function () {
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "100", "1000", "10")
       //await this.rewardPool.deployed()
 
-      await this.esm.transferOwnership(this.rewardPool.address)
+      await this.esm.addMinter(this.rewardPool.address)
 
       await this.rewardPool.add("100", this.lp.address, true)
 
@@ -130,7 +131,7 @@ describe("EasySwapRewardPool", function () {
       // 100 per block farming rate starting at block 200 with bonus until block 1000
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "200", "1000", "10")
       await this.rewardPool.deployed()
-      await this.esm.transferOwnership(this.rewardPool.address)
+      await this.esm.addMinter(this.rewardPool.address)
       await this.rewardPool.add("100", this.lp.address, true)
       await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
       await this.rewardPool.setCurrentBlock("200")
@@ -155,7 +156,7 @@ describe("EasySwapRewardPool", function () {
       // 100 per block farming rate starting at block 300 with bonus until block 1000
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "300", "1000", "10")
       await this.rewardPool.deployed()
-      await this.esm.transferOwnership(this.rewardPool.address)
+      await this.esm.addMinter(this.rewardPool.address)
       await this.rewardPool.add("100", this.lp.address, true)
       await this.lp.connect(this.alice).approve(this.rewardPool.address, "1000", {
         from: this.alice.address,
@@ -222,7 +223,7 @@ describe("EasySwapRewardPool", function () {
     it("should give proper ESMs allocation to each pool", async function () {
       // 100 per block farming rate starting at block 400 with bonus until block 1000
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "400", "1000", "10")
-      await this.esm.transferOwnership(this.rewardPool.address)
+      await this.esm.addMinter(this.rewardPool.address)
       await this.lp.connect(this.alice).approve(this.rewardPool.address, "1000", { from: this.alice.address })
       await this.lp2.connect(this.bob).approve(this.rewardPool.address, "1000", { from: this.bob.address })
       // Add first LP to the pool with allocation 1
@@ -249,7 +250,7 @@ describe("EasySwapRewardPool", function () {
     it("should stop giving bonus ESMs after the bonus period ends", async function () {
       // 100 per block farming rate starting at block 500 with bonus until block 600
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "500", "600", "10")
-      await this.esm.transferOwnership(this.rewardPool.address)
+      await this.esm.addMinter(this.rewardPool.address)
       await this.lp.connect(this.alice).approve(this.rewardPool.address, "1000", { from: this.alice.address })
       await this.rewardPool.add("1", this.lp.address, true)
 
@@ -276,7 +277,7 @@ describe("EasySwapRewardPool", function () {
       beforeEach(async function () {
         this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "500", "600", "10")
         await this.rewardPool.deployed()
-        await this.esm.transferOwnership(this.rewardPool.address)
+        await this.esm.addMinter(this.rewardPool.address)
         await this.lp.connect(this.alice).approve(this.rewardPool.address, "1000", { from: this.alice.address })
         await this.rewardPool.add("1", this.lp.address, true)
 

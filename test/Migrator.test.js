@@ -47,7 +47,7 @@ describe("Migrator", function () {
     this.migrator = await this.Migrator.deploy(this.rewardPool.address, this.factory1.address, this.factory2.address, "0")
     await this.migrator.deployed()
 
-    await this.esm.transferOwnership(this.rewardPool.address)
+    await this.esm.addMinter(this.rewardPool.address)
 
     await this.rewardPool.add("100", this.lp1.address, true)
   })

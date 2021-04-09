@@ -16,8 +16,8 @@ contract('ERC20', function (accounts) {
 
   beforeEach(async function () {
     this.token = await EasySwapMakerToken.new();
-    this.token.addMinter(initialHolder)
-    this.token.mint(initialHolder, initialSupply);
+    await this.token.addMinter(initialHolder)
+    await this.token.mint(initialHolder, initialSupply);
   });
 
   it('has a name', async function () {
