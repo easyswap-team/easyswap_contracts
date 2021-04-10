@@ -27,6 +27,9 @@ describe("Migrator", function () {
     this.esm = await this.EasySwapMakerToken.deploy()
     await this.esm.deployed()
 
+    this.esg = await this.ERC20Mock.deploy("EasySwap Governance", "ESG", "10000000000")
+    await this.esg.deployed()
+
     this.weth = await this.ERC20Mock.deploy("WETH", "WETH", "100000000")
     await this.weth.deployed()
 
@@ -41,7 +44,7 @@ describe("Migrator", function () {
 
     this.lp2 = await this.UniswapV2Pair.attach((await pair2.wait()).events[0].args.pair)
 
-    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "1000", "0", "100000", "10")
+    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "1000", "0", "100000", "10")
     await this.rewardPool.deployed()
 
     this.migrator = await this.Migrator.deploy(this.rewardPool.address, this.factory1.address, this.factory2.address, "0")

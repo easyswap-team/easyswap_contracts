@@ -60,8 +60,10 @@ contract EasySwapRewardPool is Ownable {
         uint256 endBlock;
         uint256 multiplier;
     }
-    // The ESM TOKEN!
+    // EasySwap MarketMaker token
     EasySwapMakerToken public esm;
+    // EasySwap Governance Token
+    IERC20 public esg;
     // Dev address.
     address public devaddr;
     // Block number when bonus ESM period ends.
@@ -92,6 +94,7 @@ contract EasySwapRewardPool is Ownable {
 
     constructor(
         EasySwapMakerToken _esm,
+        IERC20 _esg,
         address _devaddr,
         uint256 _esmPerBlock,
         uint256 _startBlock,
@@ -99,6 +102,7 @@ contract EasySwapRewardPool is Ownable {
         uint256 _firstStageMultiplier
     ) public {
         esm = _esm;
+        esg = _esg;
         devaddr = _devaddr;
         esmPerBlock = _esmPerBlock;
         startBlock = _startBlock;

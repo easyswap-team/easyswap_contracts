@@ -4,12 +4,14 @@ pragma solidity 0.6.12;
 
 import "../EasySwapRewardPool.sol";
 import "../EasySwapMakerToken.sol";
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract EasySwapRewardPoolMock is EasySwapRewardPool {
     uint256 private currentBlock;
 
     constructor(
         EasySwapMakerToken _esm,
+        IERC20 _esg,
         address _devaddr,
         uint256 _esmPerBlock,
         uint256 _startBlock,
@@ -17,7 +19,7 @@ contract EasySwapRewardPoolMock is EasySwapRewardPool {
         uint256 _firstStageMultiplier
     )
         public
-        EasySwapRewardPool(_esm, _devaddr, _esmPerBlock, _startBlock, _firstStageEndBlock, _firstStageMultiplier)
+        EasySwapRewardPool(_esm, _esg, _devaddr, _esmPerBlock, _startBlock, _firstStageEndBlock, _firstStageMultiplier)
     {}
 
     function setCurrentBlock(uint256 _currentBlock) public {
