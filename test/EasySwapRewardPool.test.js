@@ -247,7 +247,7 @@ describe("EasySwapRewardPool", function () {
       expect(await this.rewardPool.pendingEsm(1, this.bob.address)).to.equal("3333")
     })
 
-    it("should stop giving bonus ESMs after the bonus period ends", async function () {
+    it("should stop giving bonus ESMs after end of all stages", async function () {
       // 100 per block farming rate starting at block 500 with bonus until block 600
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100", "500", "600", "10")
       await this.esm.addMinter(this.rewardPool.address)
@@ -285,7 +285,12 @@ describe("EasySwapRewardPool", function () {
         await this.rewardPool.addStage("800", "1")
       })
 
-      it('can be read from public array', async function () {
+      it('addStage reverts if new endBlock is less than or equal to previous', async function () {
+        await expect(this.rewardPool.addStage("799", "1")).to.be.revertedWith("addStage: new endBlock less than previous")
+        await expect(this.rewardPool.addStage("800", "1")).to.be.revertedWith("addStage: new endBlock less than previous")
+      })
+
+      it('stages are displayed correctly', async function () {
         stage_0 = await this.rewardPool.stages(0)
         stage_1 = await this.rewardPool.stages(1)
         stage_2 = await this.rewardPool.stages(2)
@@ -301,7 +306,7 @@ describe("EasySwapRewardPool", function () {
         expect(stage_2.multiplier).to.equal("1")
       })
 
-      it('getMultiplier() works', async function () {
+      it('getMultiplier() works correctly', async function () {
         expect(await this.rewardPool.getMultiplier(500, 600)).to.equal("1000")
         expect(await this.rewardPool.getMultiplier(600, 700)).to.equal("500")
         expect(await this.rewardPool.getMultiplier(700, 800)).to.equal("100")
@@ -320,7 +325,7 @@ describe("EasySwapRewardPool", function () {
       })
     })
 
-    context('Example of esm emission', function () {
+    context('Esm emission scenario', function () {
       beforeEach(async function () {
         this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.dev.address, "100000000000000", "0", "201600", "25314")
         await this.rewardPool.deployed()
@@ -333,7 +338,7 @@ describe("EasySwapRewardPool", function () {
         await this.rewardPool.add("1", this.lp.address, true)
       })
 
-      it('1st week rewards is right', async function () {
+      it('1st week rewards are correct', async function () {
         // day 1
         await this.rewardPool.setCurrentBlock("0")
         await this.rewardPool.connect(this.alice).deposit(0, "10", { from: this.alice.address })
@@ -411,7 +416,7 @@ describe("EasySwapRewardPool", function () {
 
         expect(await this.esm.balanceOf(this.alice.address)).to.equal("151884000000000000000000") // daily * (1 + 1/3 + 1/6 + 1/6 + 1/6 + 1/4)
         expect(await this.esm.balanceOf(this.bob.address)).to.equal("157959360000000000000000") // daily * (2/3 + 1/3 + 1/3 + 1/3 + 1/2 + 1/2)
-        expect(await this.esm.balanceOf(this.carol.address)).to.equal("127582560000000000000000") // daily * daily * (1/2 + 1/2 + 1/2 + 1/4)
+        expect(await this.esm.balanceOf(this.carol.address)).to.equal("127582560000000000000000") // daily * (1/2 + 1/2 + 1/2 + 1/4)
         expect(await this.esm.balanceOf(this.rewardPool.address)).to.equal("0")
 
         expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal("0") // withdrawed, now 0
@@ -424,9 +429,11 @@ describe("EasySwapRewardPool", function () {
 
         expect(await this.esm.balanceOf(this.alice.address)).to.equal("151884000000000000000000") // daily * (1 + 1/3 + 1/6 + 1/6 + 1/6 + 1/4)
         expect(await this.esm.balanceOf(this.bob.address)).to.equal("157959360000000000000000") // daily * (2/3 + 1/3 + 1/3 + 1/3 + 1/2 + 1/2)
-        expect(await this.esm.balanceOf(this.carol.address)).to.equal("127582560000000000000000") // daily * daily * (1/2 + 1/2 + 1/2 + 1/4)
-        expect(await this.esm.balanceOf(this.carol.address)).to.equal("127582560000000000000000") // daily * daily * (1/2 + 1/2 + 1/2 + 1/4)
-        expect(await this.esm.balanceOf(this.dev.address)).to.equal("43742592000000000000000") // daily * daily * (1/2 + 1/2 + 1/2 + 1/4)
+        expect(await this.esm.balanceOf(this.carol.address)).to.equal("127582560000000000000000") // daily * (1/2 + 1/2 + 1/2 + 1/4)
+        expect(await this.esm.balanceOf(this.carol.address)).to.equal("127582560000000000000000") // daily * (1/2 + 1/2 + 1/2 + 1/4)
+        expect(await this.esm.balanceOf(this.dev.address)).to.equal("43742592000000000000000") // daily * (1/2 + 1/2 + 1/2 + 1/4)
+
+        expect(await this.esm.totalSupply()).to.equal("481168512000000000000000") // 6 daily rewards + dev's 10%
 
         expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal("0") // withdrawed, now 0
         expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0") // withdrawed, now 0

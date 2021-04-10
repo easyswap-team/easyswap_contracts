@@ -74,7 +74,7 @@ contract EasySwapRewardPool is Ownable {
     PoolInfo[] public poolInfo;
     // Info of each user that stakes LP tokens.
     mapping(uint256 => mapping(address => UserInfo)) public userInfo;
-    // Total allocation poitns. Must be the sum of all allocation points in all pools.
+    // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when ESM mining starts.
     uint256 public startBlock;
@@ -168,7 +168,7 @@ contract EasySwapRewardPool is Ownable {
     function addStage(uint256 _endBlock, uint256 _multiplier) public onlyOwner {
         Stage memory lastStage = stages[stages.length.sub(1)];
 
-        require(_endBlock > lastStage.endBlock);
+        require(_endBlock > lastStage.endBlock, "addStage: new endBlock less than previous");
 
         stages.push(Stage(_endBlock, _multiplier));
         emit StageAdded(_endBlock, _multiplier);
