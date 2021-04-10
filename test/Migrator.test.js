@@ -44,7 +44,7 @@ describe("Migrator", function () {
 
     this.lp2 = await this.UniswapV2Pair.attach((await pair2.wait()).events[0].args.pair)
 
-    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "1000", "0", "100000", "10")
+    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "100")
     await this.rewardPool.deployed()
 
     this.migrator = await this.Migrator.deploy(this.rewardPool.address, this.factory1.address, this.factory2.address, "0")

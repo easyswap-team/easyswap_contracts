@@ -65,7 +65,7 @@ describe("Timelock", function () {
   it("should also work with EasySwapRewardPool", async function () {
     this.lp1 = await this.ERC20Mock.deploy("LPToken", "LP", "10000000000")
     this.lp2 = await this.ERC20Mock.deploy("LPToken", "LP", "10000000000")
-    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "1000", "0", "1000", "10")
+    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "100")
     await this.esm.transferOwnership(this.rewardPool.address)
     await this.rewardPool.add("100", this.lp1.address, true)
     await this.rewardPool.transferOwnership(this.timelock.address)

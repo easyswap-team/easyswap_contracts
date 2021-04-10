@@ -58,7 +58,8 @@ contract EasySwapRewardPool is Ownable {
     // Info of each multiplier stage.
     struct Stage {
         uint256 endBlock;
-        uint256 multiplier;
+        uint256 esmPerBlock;
+        uint256 esgPerBlock;
     }
     // EasySwap MarketMaker token
     EasySwapMakerToken public esm;
@@ -83,7 +84,7 @@ contract EasySwapRewardPool is Ownable {
     // Array of stages
     Stage[] public stages;
     //
-    event StageAdded(uint256 endBlock, uint256 multiplier);
+    event StageAdded(uint256 endBlock, uint256 esmPerBlock, uint256 esgPerBlock);
     event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
     event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
     event EmergencyWithdraw(
@@ -96,17 +97,12 @@ contract EasySwapRewardPool is Ownable {
         EasySwapMakerToken _esm,
         IERC20 _esg,
         address _devaddr,
-        uint256 _esmPerBlock,
-        uint256 _startBlock,
-        uint256 _firstStageEndBlock,
-        uint256 _firstStageMultiplier
+        uint256 _startBlock
     ) public {
         esm = _esm;
         esg = _esg;
         devaddr = _devaddr;
-        esmPerBlock = _esmPerBlock;
         startBlock = _startBlock;
-        stages.push(Stage(_firstStageEndBlock, _firstStageMultiplier));
     }
 
     function poolLength() external view returns (uint256) {
@@ -169,43 +165,53 @@ contract EasySwapRewardPool is Ownable {
     }
 
     // Add new stage with its own multiplier.
-    function addStage(uint256 _endBlock, uint256 _multiplier) public onlyOwner {
-        Stage memory lastStage = stages[stages.length.sub(1)];
+    function addStage(uint256 _endBlock, uint256 _esmPerBlock, uint256 _esgPerBlock) public onlyOwner {
+        require(_endBlock > startBlock, "addStage: new endBlock less than startBlock");
+        if (stages.length > 0) {
+            Stage memory lastStage = stages[stages.length.sub(1)];
+            require(_endBlock > lastStage.endBlock, "addStage: new endBlock less than previous");
+        }
 
-        require(_endBlock > lastStage.endBlock, "addStage: new endBlock less than previous");
-
-        stages.push(Stage(_endBlock, _multiplier));
-        emit StageAdded(_endBlock, _multiplier);
+        stages.push(Stage(_endBlock, _esmPerBlock, _esgPerBlock));
+        emit StageAdded(_endBlock, _esmPerBlock, _esgPerBlock);
     }
 
-    // Return reward multiplier over the given _from to _to block.
-    function getMultiplier(uint256 _from, uint256 _to)
+    // Return total ESM & ESG over the given _from to _to block.
+    function getTotalEsxRewards(uint256 _from, uint256 _to)
         public
         view
-        returns (uint256)
+        returns (uint256 esmReward, uint256 esgReward)
     {
         assert(_from <= _to);
 
-        uint256 multiplier = 0;
+        uint256 stagesLength = stages.length;
+        if (stagesLength == 0)
+            return (0, 0);
 
-        uint256 tmp_from = _from;
+        if (_to <= startBlock)
+            return (0, 0);
+
+        esmReward = 0;
+        esgReward = 0;
+
+        uint256 tmp_from = _from > startBlock ? _from : startBlock;
         uint256 tmp_to;
 
         Stage memory stage;
 
-        for (uint256 i = 0; i < stages.length; i++) {
+        for (uint256 i = 0; i < stagesLength; i++) {
             stage = stages[i];
             if (tmp_from > stage.endBlock)
                 continue;
             tmp_to = stage.endBlock < _to ? stage.endBlock : _to;
-            multiplier =
-                multiplier.add(tmp_to.sub(tmp_from).mul(stage.multiplier));
+            esmReward = esmReward.add(tmp_to.sub(tmp_from).mul(stage.esmPerBlock));
+            esgReward = esgReward.add(tmp_to.sub(tmp_from).mul(stage.esgPerBlock));
             if (tmp_to == _to)
                 break;
             tmp_from = tmp_to;
         }
 
-        return multiplier;
+        return (esmReward, esgReward);
     }
 
     // View function to see pending ESMs on frontend.
@@ -219,15 +225,9 @@ contract EasySwapRewardPool is Ownable {
         uint256 accEsmPerShare = pool.accEsmPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (_getCurrentBlock() > pool.lastRewardBlock && lpSupply != 0) {
-            uint256 multiplier =
-                getMultiplier(pool.lastRewardBlock, _getCurrentBlock());
-            uint256 esmReward =
-                multiplier.mul(esmPerBlock).mul(pool.allocPoint).div(
-                    totalAllocPoint
-                );
-            accEsmPerShare = accEsmPerShare.add(
-                esmReward.mul(1e12).div(lpSupply)
-            );
+            (uint256 esmTotalReward,) = getTotalEsxRewards(pool.lastRewardBlock, _getCurrentBlock());
+            uint256 esmReward = esmTotalReward.mul(pool.allocPoint).div(totalAllocPoint);
+            accEsmPerShare = accEsmPerShare.add(esmReward.mul(1e12).div(lpSupply));
         }
         return user.amount.mul(accEsmPerShare).div(1e12).sub(user.rewardDebt);
     }
@@ -251,13 +251,16 @@ contract EasySwapRewardPool is Ownable {
             pool.lastRewardBlock = _getCurrentBlock();
             return;
         }
-        uint256 multiplier = getMultiplier(pool.lastRewardBlock, _getCurrentBlock());
-        uint256 esmReward =
-            multiplier.mul(esmPerBlock).mul(pool.allocPoint).div(
-                totalAllocPoint
-            );
+        (uint256 totalEsmReward, uint256 totalEsgReward) =
+            getTotalEsxRewards(pool.lastRewardBlock, _getCurrentBlock());
+        uint256 esmReward = totalEsmReward.mul(pool.allocPoint).div(totalAllocPoint);
+        uint256 esgReward = totalEsgReward.mul(pool.allocPoint).div(totalAllocPoint);
+
+        // todo use setter for fee
         esm.mint(devaddr, esmReward.div(10));
-        esm.mint(address(this), esmReward);
+        esm.mint(devaddr, esmReward.mul(9).div(10));
+        // todo esg.transfer(address(this), esmReward);
+        // todo check this logic
         pool.accEsmPerShare = pool.accEsmPerShare.add(
             esmReward.mul(1e12).div(lpSupply)
         );

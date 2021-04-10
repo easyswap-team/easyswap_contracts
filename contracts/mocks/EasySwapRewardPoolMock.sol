@@ -13,13 +13,10 @@ contract EasySwapRewardPoolMock is EasySwapRewardPool {
         EasySwapMakerToken _esm,
         IERC20 _esg,
         address _devaddr,
-        uint256 _esmPerBlock,
-        uint256 _startBlock,
-        uint256 _firstStageEndBlock,
-        uint256 _firstStageMultiplier
+        uint256 _startBlock
     )
         public
-        EasySwapRewardPool(_esm, _esg, _devaddr, _esmPerBlock, _startBlock, _firstStageEndBlock, _firstStageMultiplier)
+        EasySwapRewardPool(_esm, _esg, _devaddr, _startBlock)
     {}
 
     function setCurrentBlock(uint256 _currentBlock) public {
