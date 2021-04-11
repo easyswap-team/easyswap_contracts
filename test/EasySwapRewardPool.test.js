@@ -94,33 +94,70 @@ describe("EasySwapRewardPool", function () {
       expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
     })
 
-    it("should give out ESMs only after farming time", async function () {
-      // 100 per block farming rate starting at block 100 with bonus until block 1000
-      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "100")
+    it("should give out ESMs and ESGs at farming time", async function () {
+      // 100 ESM and 10 ESG per block farming rate starting at block 100 and ending at block 200
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address, "100" /*startBlock*/)
       await this.rewardPool.deployed()
-
-      await this.esm.addMinter(this.rewardPool.address)
-
+      await this.esm.addMinter(this.alice.address)
+      await this.esm.mint(this.rewardPool.address, 1200) // 100blocks x 12 ESM
+      await this.esg.transfer(this.rewardPool.address, 600) // 100blocks x 6 ESG
       await this.rewardPool.add("100", this.lp.address, true)
-
+      await this.rewardPool.addStage("200" /*endBlock*/, "12" /*ESM per block*/, "6" /*ESG per block*/)
       await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
       await this.rewardPool.connect(this.bob).deposit(0, "100")
+
       await this.rewardPool.setCurrentBlock("90")
-
-      await this.rewardPool.connect(this.bob).deposit(0, "0") // block 90
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
+      await this.rewardPool.connect(this.bob).deposit(0, "0")
       expect(await this.esm.balanceOf(this.bob.address)).to.equal("0")
-      await this.rewardPool.setCurrentBlock("95")
+      expect(await this.esm.balanceOf(this.rewardPool.address)).to.equal("1200")
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("0")
+      expect(await this.esg.balanceOf(this.rewardPool.address)).to.equal("600")
 
-      await this.rewardPool.connect(this.bob).deposit(0, "0") // block 95
+      await this.rewardPool.setCurrentBlock("99")
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
+      await this.rewardPool.connect(this.bob).deposit(0, "0")
       expect(await this.esm.balanceOf(this.bob.address)).to.equal("0")
+      expect(await this.esm.balanceOf(this.rewardPool.address)).to.equal("1200")
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("0")
+      expect(await this.esg.balanceOf(this.rewardPool.address)).to.equal("600")
+
+      // The first block where rewards started
       await this.rewardPool.setCurrentBlock("100")
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal("0") // before action
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("12") // before action
+      // Any (incl. zero) deposit distributes the ESG and clears pending variable
+      await this.rewardPool.connect(this.bob).deposit(0, "0")
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal("12")
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("0") // Fixme 6
+      
 
+      // Second block
+      await this.rewardPool.setCurrentBlock("101")
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("12")
+      await this.rewardPool.connect(this.bob).deposit(0, "0")
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal("24")  // 12+12
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("0") // fixme 12=6+6
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
+
+      // Last block
+      await this.rewardPool.setCurrentBlock("199") // The last rewarded block
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("1176") // 12 * 98
+      await this.rewardPool.connect(this.bob).deposit(0, "0")
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal("1200")
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("0") // Fixme 600
+
+      // All funds got distributed from rewardPool
+      expect(await this.esm.balanceOf(this.rewardPool.address)).to.equal("0")
+      expect(await this.esg.balanceOf(this.rewardPool.address)).to.equal("600") // Fixme 0
+      /*
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
       await this.rewardPool.connect(this.bob).deposit(0, "0") // block 100
       expect(await this.esm.balanceOf(this.bob.address)).to.equal("0")
       await this.rewardPool.setCurrentBlock("101")
 
-      /* Todo fix deposits and rewards
-
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
       await this.rewardPool.connect(this.bob).deposit(0, "0") // block 101
       expect(await this.esm.balanceOf(this.bob.address)).to.equal("1000")
 

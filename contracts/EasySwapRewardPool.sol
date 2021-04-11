@@ -102,7 +102,7 @@ contract EasySwapRewardPool is Ownable {
         esm = _esm;
         esg = _esg;
         devaddr = _devaddr;
-        startBlock = _startBlock;
+        startBlock = _startBlock.sub(1);
     }
 
     function poolLength() external view returns (uint256) {
@@ -257,8 +257,8 @@ contract EasySwapRewardPool is Ownable {
         uint256 esgReward = totalEsgReward.mul(pool.allocPoint).div(totalAllocPoint);
 
         // todo use setter for fee
-        esm.mint(devaddr, esmReward.div(10));
-        esm.mint(devaddr, esmReward.mul(9).div(10));
+        // esm.mint(devaddr, esmReward.div(10));
+        // esm.mint(devaddr, esmReward.mul(9).div(10));
         // todo esg.transfer(address(this), esmReward);
         // todo check this logic
         pool.accEsmPerShare = pool.accEsmPerShare.add(
@@ -277,7 +277,7 @@ contract EasySwapRewardPool is Ownable {
                 user.amount.mul(pool.accEsmPerShare).div(1e12).sub(
                     user.rewardDebt
                 );
-            safeEsmTransfer(msg.sender, pending);
+            safeEsxTransfer(esm, msg.sender, pending);
         }
         pool.lpToken.safeTransferFrom(
             address(msg.sender),
@@ -299,7 +299,7 @@ contract EasySwapRewardPool is Ownable {
             user.amount.mul(pool.accEsmPerShare).div(1e12).sub(
                 user.rewardDebt
             );
-        safeEsmTransfer(msg.sender, pending);
+        safeEsxTransfer(esm, msg.sender, pending);
         user.amount = user.amount.sub(_amount);
         user.rewardDebt = user.amount.mul(pool.accEsmPerShare).div(1e12);
         pool.lpToken.safeTransfer(address(msg.sender), _amount);
@@ -321,13 +321,13 @@ contract EasySwapRewardPool is Ownable {
         return block.number;
     }
 
-    // Safe esm transfer function, just in case if rounding error causes pool to not have enough ESMs.
-    function safeEsmTransfer(address _to, uint256 _amount) internal {
-        uint256 esmBal = esm.balanceOf(address(this));
-        if (_amount > esmBal) {
-            esm.transfer(_to, esmBal);
+    // Safe tokenTransfer function, just in case if rounding error causes pool to not have enough balance
+    function safeEsxTransfer(IERC20 _token, address _to, uint256 _amount) internal {
+        uint256 bal = _token.balanceOf(address(this));
+        if (_amount > bal) {
+            _token.transfer(_to, bal);
         } else {
-            esm.transfer(_to, _amount);
+            _token.transfer(_to, _amount);
         }
     }
 
