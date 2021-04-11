@@ -6,6 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/EnumerableSet.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
+import "@openzeppelin/contracts/math/Math.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./EasySwapMakerToken.sol";
 
@@ -35,7 +36,8 @@ contract EasySwapRewardPool is Ownable {
     // Info of each user.
     struct UserInfo {
         uint256 amount; // How many LP tokens the user has provided.
-        uint256 rewardDebt; // Reward debt. See explanation below.
+        uint256 esmRewardDebt; // Reward debt. See explanation below.
+        uint256 esgRewardDebt; // Reward debt. See explanation below.
         //
         // We do some fancy math here. Basically, any point in time, the amount of ESMs
         // entitled to a user but is pending to be distributed is:
@@ -54,9 +56,11 @@ contract EasySwapRewardPool is Ownable {
         uint256 allocPoint; // How many allocation points assigned to this pool. ESMs to distribute per block.
         uint256 lastRewardBlock; // Last block number that ESMs distribution occurs.
         uint256 accEsmPerShare; // Accumulated ESMs per share, times 1e12. See below.
+        uint256 accEsgPerShare; // Accumulated ESGs per share, times 1e12. See below.
     }
     // Info of each multiplier stage.
     struct Stage {
+        uint256 startBlock;
         uint256 endBlock;
         uint256 esmPerBlock;
         uint256 esgPerBlock;
@@ -65,6 +69,8 @@ contract EasySwapRewardPool is Ownable {
     EasySwapMakerToken public esm;
     // EasySwap Governance Token
     IERC20 public esg;
+    // DevFee in ppm (parts per million).
+    uint256 devFeePpm = 0; // 0%
     // Dev address.
     address public devaddr;
     // Block number when bonus ESM period ends.
@@ -80,7 +86,7 @@ contract EasySwapRewardPool is Ownable {
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when ESM mining starts.
-    uint256 public startBlock;
+    // uint256 public startBlock;
     // Array of stages
     Stage[] public stages;
     //
@@ -96,13 +102,11 @@ contract EasySwapRewardPool is Ownable {
     constructor(
         EasySwapMakerToken _esm,
         IERC20 _esg,
-        address _devaddr,
-        uint256 _startBlock
+        address _devaddr
     ) public {
         esm = _esm;
         esg = _esg;
         devaddr = _devaddr;
-        startBlock = _startBlock.sub(1);
     }
 
     function poolLength() external view returns (uint256) {
@@ -116,18 +120,20 @@ contract EasySwapRewardPool is Ownable {
         IERC20 _lpToken,
         bool _withUpdate
     ) public onlyOwner {
+        require(stages.length > 0, "add: No stages configured");
         if (_withUpdate) {
             massUpdatePools();
         }
         uint256 lastRewardBlock =
-            _getCurrentBlock() > startBlock ? _getCurrentBlock() : startBlock;
+            _getCurrentBlock() > stages[0].startBlock ? _getCurrentBlock() : stages[0].startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
         poolInfo.push(
             PoolInfo({
                 lpToken: _lpToken,
                 allocPoint: _allocPoint,
                 lastRewardBlock: lastRewardBlock,
-                accEsmPerShare: 0
+                accEsmPerShare: 0,
+                accEsgPerShare: 0
             })
         );
     }
@@ -165,14 +171,15 @@ contract EasySwapRewardPool is Ownable {
     }
 
     // Add new stage with its own multiplier.
-    function addStage(uint256 _endBlock, uint256 _esmPerBlock, uint256 _esgPerBlock) public onlyOwner {
-        require(_endBlock > startBlock, "addStage: new endBlock less than startBlock");
+    function addStage(uint256 _startBlock, uint256 _endBlock, uint256 _esmPerBlock, uint256 _esgPerBlock) public onlyOwner {
+        require(_endBlock > _startBlock, "addStage: new endBlock should be more than startBlock");
         if (stages.length > 0) {
             Stage memory lastStage = stages[stages.length.sub(1)];
+            require(_startBlock == lastStage.endBlock.add(1), "addStage: new startBlock should be adjacent to previous stage");
             require(_endBlock > lastStage.endBlock, "addStage: new endBlock less than previous");
         }
 
-        stages.push(Stage(_endBlock, _esmPerBlock, _esgPerBlock));
+        stages.push(Stage(_startBlock, _endBlock, _esmPerBlock, _esgPerBlock));
         emit StageAdded(_endBlock, _esmPerBlock, _esgPerBlock);
     }
 
@@ -187,34 +194,34 @@ contract EasySwapRewardPool is Ownable {
         uint256 stagesLength = stages.length;
         if (stagesLength == 0)
             return (0, 0);
-
-        if (_to <= startBlock)
+        
+        if (_to < stages[0].startBlock)
             return (0, 0);
 
         esmReward = 0;
         esgReward = 0;
 
-        uint256 tmp_from = _from > startBlock ? _from : startBlock;
-        uint256 tmp_to;
-
         Stage memory stage;
 
         for (uint256 i = 0; i < stagesLength; i++) {
             stage = stages[i];
-            if (tmp_from > stage.endBlock)
-                continue;
-            tmp_to = stage.endBlock < _to ? stage.endBlock : _to;
-            esmReward = esmReward.add(tmp_to.sub(tmp_from).mul(stage.esmPerBlock));
-            esgReward = esgReward.add(tmp_to.sub(tmp_from).mul(stage.esgPerBlock));
-            if (tmp_to == _to)
-                break;
-            tmp_from = tmp_to;
+            // calculate rewardedBlocks as the intersection of
+            // given (_from, _to) of period and stage boundary (inclusively)
+            uint256 commonFrom = Math.max(_from, stage.startBlock);
+            uint256 commonTo = Math.min(_to, stage.endBlock);
+            if (commonFrom <= commonTo) {
+                // We are in the interval of current stage
+                // Calculations include boundaries so we add +1
+                uint256 rewardedBlocks = commonTo.add(1).sub(commonFrom);
+                esmReward = esmReward.add(rewardedBlocks.mul(stage.esmPerBlock));
+                esgReward = esgReward.add(rewardedBlocks.mul(stage.esgPerBlock));
+            }
         }
 
         return (esmReward, esgReward);
     }
 
-    // View function to see pending ESMs on frontend.
+    // View function to see pending ESx tokens on frontend.
     function pendingEsm(uint256 _pid, address _user)
         external
         view
@@ -225,11 +232,28 @@ contract EasySwapRewardPool is Ownable {
         uint256 accEsmPerShare = pool.accEsmPerShare;
         uint256 lpSupply = pool.lpToken.balanceOf(address(this));
         if (_getCurrentBlock() > pool.lastRewardBlock && lpSupply != 0) {
-            (uint256 esmTotalReward,) = getTotalEsxRewards(pool.lastRewardBlock, _getCurrentBlock());
+            (uint256 esmTotalReward,) = getTotalEsxRewards(pool.lastRewardBlock.add(1), _getCurrentBlock());
             uint256 esmReward = esmTotalReward.mul(pool.allocPoint).div(totalAllocPoint);
             accEsmPerShare = accEsmPerShare.add(esmReward.mul(1e12).div(lpSupply));
         }
-        return user.amount.mul(accEsmPerShare).div(1e12).sub(user.rewardDebt);
+        return user.amount.mul(accEsmPerShare).div(1e12).sub(user.esmRewardDebt);
+    }
+
+    function pendingEsg(uint256 _pid, address _user)
+        external
+        view
+        returns (uint256)
+    {
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][_user];
+        uint256 accEsgPerShare = pool.accEsgPerShare;
+        uint256 lpSupply = pool.lpToken.balanceOf(address(this));
+        if (_getCurrentBlock() > pool.lastRewardBlock && lpSupply != 0) {
+            (, uint256 esgTotalReward) = getTotalEsxRewards(pool.lastRewardBlock.add(1), _getCurrentBlock());
+            uint256 esgReward = esgTotalReward.mul(pool.allocPoint).div(totalAllocPoint);
+            accEsgPerShare = accEsgPerShare.add(esgReward.mul(1e12).div(lpSupply));
+        }
+        return user.amount.mul(accEsgPerShare).div(1e12).sub(user.esgRewardDebt);
     }
 
     // Update reward vairables for all pools. Be careful of gas spending!
@@ -240,7 +264,7 @@ contract EasySwapRewardPool is Ownable {
         }
     }
 
-    // Update reward variables of the given pool to be up-to-date.
+    // Enforce reward, update ESM and ESG shares for the given pool and pay devs fee
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
         if (_getCurrentBlock() <= pool.lastRewardBlock) {
@@ -256,15 +280,22 @@ contract EasySwapRewardPool is Ownable {
         uint256 esmReward = totalEsmReward.mul(pool.allocPoint).div(totalAllocPoint);
         uint256 esgReward = totalEsgReward.mul(pool.allocPoint).div(totalAllocPoint);
 
-        // todo use setter for fee
-        // esm.mint(devaddr, esmReward.div(10));
-        // esm.mint(devaddr, esmReward.mul(9).div(10));
-        // todo esg.transfer(address(this), esmReward);
-        // todo check this logic
+        // ESM and ESG fees for developer's fund
+        uint256 esmFee = esmReward.mul(devFeePpm).div(1e6);
+        uint256 esgFee = esmReward.mul(devFeePpm).div(1e6);
+
+        // Remaining ESM and ESG withdrawable by the users
+        uint256 esmWithdrawable = esmReward.sub(esmFee);
+        uint256 esgWithdrawable = esgReward.sub(esgFee);
+
         pool.accEsmPerShare = pool.accEsmPerShare.add(
-            esmReward.mul(1e12).div(lpSupply)
+            esmWithdrawable.mul(1e12).div(lpSupply)
+        );
+        pool.accEsgPerShare = pool.accEsgPerShare.add(
+            esgWithdrawable.mul(1e12).div(lpSupply)
         );
         pool.lastRewardBlock = _getCurrentBlock();
+        
     }
 
     // Deposit LP tokens to EasySwapRewardPool for ESM allocation.
@@ -275,9 +306,14 @@ contract EasySwapRewardPool is Ownable {
         if (user.amount > 0) {
             uint256 pending =
                 user.amount.mul(pool.accEsmPerShare).div(1e12).sub(
-                    user.rewardDebt
+                    user.esmRewardDebt
                 );
             safeEsxTransfer(esm, msg.sender, pending);
+
+            pending = user.amount.mul(pool.accEsgPerShare).div(1e12).sub(
+                    user.esgRewardDebt
+                );
+            safeEsxTransfer(esg, msg.sender, pending);
         }
         pool.lpToken.safeTransferFrom(
             address(msg.sender),
@@ -285,7 +321,8 @@ contract EasySwapRewardPool is Ownable {
             _amount
         );
         user.amount = user.amount.add(_amount);
-        user.rewardDebt = user.amount.mul(pool.accEsmPerShare).div(1e12);
+        user.esmRewardDebt = user.amount.mul(pool.accEsmPerShare).div(1e12);
+        user.esgRewardDebt = user.amount.mul(pool.accEsgPerShare).div(1e12);
         emit Deposit(msg.sender, _pid, _amount);
     }
 
@@ -295,13 +332,23 @@ contract EasySwapRewardPool is Ownable {
         UserInfo storage user = userInfo[_pid][msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
+        // ESM payout
         uint256 pending =
             user.amount.mul(pool.accEsmPerShare).div(1e12).sub(
-                user.rewardDebt
+                user.esmRewardDebt
             );
         safeEsxTransfer(esm, msg.sender, pending);
+
+        // ESG payout
+        pending =
+            user.amount.mul(pool.accEsgPerShare).div(1e12).sub(
+                user.esgRewardDebt
+            );
+        safeEsxTransfer(esg, msg.sender, pending);
+
         user.amount = user.amount.sub(_amount);
-        user.rewardDebt = user.amount.mul(pool.accEsmPerShare).div(1e12);
+        user.esmRewardDebt = user.amount.mul(pool.accEsmPerShare).div(1e12);
+        user.esgRewardDebt = user.amount.mul(pool.accEsgPerShare).div(1e12);
         pool.lpToken.safeTransfer(address(msg.sender), _amount);
         emit Withdraw(msg.sender, _pid, _amount);
     }
@@ -313,7 +360,8 @@ contract EasySwapRewardPool is Ownable {
         pool.lpToken.safeTransfer(address(msg.sender), user.amount);
         emit EmergencyWithdraw(msg.sender, _pid, user.amount);
         user.amount = 0;
-        user.rewardDebt = 0;
+        user.esmRewardDebt = 0;
+        user.esgRewardDebt = 0;
     }
 
     // Returns block.number, overridable for test purposes.

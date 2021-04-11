@@ -12,11 +12,10 @@ contract EasySwapRewardPoolMock is EasySwapRewardPool {
     constructor(
         EasySwapMakerToken _esm,
         IERC20 _esg,
-        address _devaddr,
-        uint256 _startBlock
+        address _devaddr
     )
         public
-        EasySwapRewardPool(_esm, _esg, _devaddr, _startBlock)
+        EasySwapRewardPool(_esm, _esg, _devaddr)
     {}
 
     function setCurrentBlock(uint256 _currentBlock) public {
