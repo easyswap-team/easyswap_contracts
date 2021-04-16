@@ -24,7 +24,7 @@ describe("Migrator", function () {
     this.factory2 = await this.UniswapV2Factory.deploy(this.alice.address)
     await this.factory2.deployed()
 
-    this.esm = await this.EasySwapMakerToken.deploy()
+    this.esm = await this.EasySwapMakerToken.deploy(this.alice.address, "10000000000")
     await this.esm.deployed()
 
     this.esg = await this.ERC20Mock.deploy("EasySwap Governance", "ESG", "10000000000")
@@ -50,8 +50,6 @@ describe("Migrator", function () {
 
     this.migrator = await this.Migrator.deploy(this.rewardPool.address, this.factory1.address, this.factory2.address, "0")
     await this.migrator.deployed()
-
-    await this.esm.addMinter(this.rewardPool.address)
 
     await this.rewardPool.add("100", this.lp1.address, true)
   })

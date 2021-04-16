@@ -15,9 +15,7 @@ contract('ERC20', function (accounts) {
   const initialSupply = new BN(100);
 
   beforeEach(async function () {
-    this.token = await EasySwapMakerToken.new();
-    await this.token.addMinter(initialHolder)
-    await this.token.mint(initialHolder, initialSupply);
+    this.token = await EasySwapMakerToken.new(initialHolder, initialSupply);
   });
 
   it('has a name', async function () {
@@ -189,77 +187,6 @@ contract('ERC20', function (accounts) {
         await expectRevert(
           this.token.increaseAllowance(spender, amount, { from: initialHolder }), 'ERC20: approve to the zero address',
         );
-      });
-    });
-  });
-
-  describe('minters', function () {
-    const amount = new BN(50);
-
-    describe('addMinter method',function(){
-
-    it('onlyOwner method', async function () {
-      await expectRevert(
-      this.token.addMinter(anotherAccount, {from: anotherAccount}), 'Ownable: caller is not the owner',);
-      });
-
-    it('addMinter', async function () {
-      await this.token.addMinter(anotherAccount)
-      await this.token.mint(anotherAccount,amount,{from: anotherAccount})
-      expect(await this.token.balanceOf(anotherAccount)).to.be.bignumber.equal(amount);
-      });
-    });
-
-    describe('delMinter method',function(){
-
-      it('onlyOwner method', async function () {
-        await expectRevert(
-          this.token.delMinter(anotherAccount, {from: anotherAccount}), 'Ownable: caller is not the owner',);
-        });
-
-      it('delMinter', async function () {
-        await this.token.delMinter(anotherAccount)
-        await expectRevert(this.token.mint(anotherAccount, amount, {from: anotherAccount}), 'Minting: caller is not the minter');
-      });
-    });
-  });
-
-  describe('mint', function () {
-    const amount = new BN(50);
-    it('rejects a null account', async function () {
-      await expectRevert(
-        this.token.mint(ZERO_ADDRESS, amount), 'ERC20: mint to the zero address',
-      );
-    });
-
-    it('onlyMinter method', async function () {
-      await expectRevert(
-        this.token.mint(ZERO_ADDRESS, amount, {from: anotherAccount}), 'Minting: caller is not the minter'
-      );
-    });
-
-    describe('for a non zero account', function () {
-      beforeEach('minting', async function () {
-        const { logs } = await this.token.mint(recipient, amount);
-        this.logs = logs;
-      });
-
-      it('increments totalSupply', async function () {
-        const expectedSupply = initialSupply.add(amount);
-        expect(await this.token.totalSupply()).to.be.bignumber.equal(expectedSupply);
-      });
-
-      it('increments recipient balance', async function () {
-        expect(await this.token.balanceOf(recipient)).to.be.bignumber.equal(amount);
-      });
-
-      it('emits Transfer event', async function () {
-        const event = expectEvent.inLogs(this.logs, 'Transfer', {
-          from: ZERO_ADDRESS,
-          to: recipient,
-        });
-
-        expect(event.args.value).to.be.bignumber.equal(amount);
       });
     });
   });
