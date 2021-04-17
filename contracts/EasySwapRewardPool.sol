@@ -73,10 +73,6 @@ contract EasySwapRewardPool is Ownable {
     uint256 public devFeePpm;
     // Dev address.
     address public devaddr;
-    // Block number when bonus ESM period ends.
-    uint256 public bonusEndBlock;
-    // ESM tokens created per block.
-    uint256 public esmPerBlock;
     // The migrator contract. It has a lot of power. Can only be set through governance (owner).
     IMigratorChef public migrator;
     // Info of each pool.
