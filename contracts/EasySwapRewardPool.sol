@@ -70,7 +70,7 @@ contract EasySwapRewardPool is Ownable {
     // EasySwap Governance Token
     IERC20 public esg;
     // DevFee in ppm (parts per million).
-    uint256 devFeePpm = 0; // 0%
+    uint256 public devFeePpm;
     // Dev address.
     address public devaddr;
     // Block number when bonus ESM period ends.
@@ -111,6 +111,14 @@ contract EasySwapRewardPool is Ownable {
 
     function poolLength() external view returns (uint256) {
         return poolInfo.length;
+    }
+
+    function setDevAddr(address _devaddr) public onlyOwner {
+        devaddr = _devaddr;
+    }
+
+    function setDevFee(uint256 _devFeePpm) public onlyOwner {
+        devFeePpm = _devFeePpm;
     }
 
     // Add a new lp to the pool. Can only be called by the owner.
@@ -172,7 +180,7 @@ contract EasySwapRewardPool is Ownable {
 
     // Add new stage with its own multiplier.
     function addStage(uint256 _startBlock, uint256 _endBlock, uint256 _esmPerBlock, uint256 _esgPerBlock) public onlyOwner {
-        require(_endBlock > _startBlock, "addStage: new endBlock should be more than startBlock");
+        require(_endBlock >= _startBlock, "addStage: new endBlock shouldn't be less than startBlock");
         if (stages.length > 0) {
             Stage memory lastStage = stages[stages.length.sub(1)];
             require(_startBlock == lastStage.endBlock.add(1), "addStage: new startBlock should be adjacent to previous stage");
@@ -280,11 +288,13 @@ contract EasySwapRewardPool is Ownable {
         uint256 esmReward = totalEsmReward.mul(pool.allocPoint).div(totalAllocPoint);
         uint256 esgReward = totalEsgReward.mul(pool.allocPoint).div(totalAllocPoint);
 
-        // ESM and ESG fees for developer's fund
+        // Calculate and pay ESM and ESG fees for developer's fund
         uint256 esmFee = esmReward.mul(devFeePpm).div(1e6);
-        uint256 esgFee = esmReward.mul(devFeePpm).div(1e6);
+        uint256 esgFee = esgReward.mul(devFeePpm).div(1e6);
+        safeEsxTransfer(esm, devaddr, esmFee);
+        safeEsxTransfer(esg, devaddr, esgFee);
 
-        // Remaining ESM and ESG withdrawable by the users
+        // Update shares for remaining ESM and ESG
         uint256 esmWithdrawable = esmReward.sub(esmFee);
         uint256 esgWithdrawable = esgReward.sub(esgFee);
 
@@ -377,11 +387,5 @@ contract EasySwapRewardPool is Ownable {
         } else {
             _token.transfer(_to, _amount);
         }
-    }
-
-    // Update dev address by the previous dev.
-    function dev(address _devaddr) public {
-        require(msg.sender == devaddr, "dev: wut?");
-        devaddr = _devaddr;
     }
 }

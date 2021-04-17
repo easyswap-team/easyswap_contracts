@@ -17,9 +17,9 @@ describe("EasySwapRewardPool", function () {
   })
 
   beforeEach(async function () {
-    this.esm = await this.EasySwapMakerToken.deploy(this.alice.address, 1200)
+    this.esm = await this.EasySwapMakerToken.deploy(this.alice.address, 10000)
     await this.esm.deployed()
-    this.esg = await this.ERC20Mock.deploy("EasySwap Governance", "ESG", "600")
+    this.esg = await this.ERC20Mock.deploy("EasySwap Governance", "ESG", "10000")
     await this.esg.deployed()
   })
 
@@ -37,21 +37,24 @@ describe("EasySwapRewardPool", function () {
     expect(owner).to.equal(this.signers[0].address)
   })
 
-  it("should allow dev and only dev to update dev", async function () {
+  it("dev address and its setter", async function () {
     this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
     await this.rewardPool.deployed()
-
     expect(await this.rewardPool.devaddr()).to.equal(this.dev.address)
 
-    await expect(this.rewardPool.connect(this.bob).dev(this.bob.address, { from: this.bob.address })).to.be.revertedWith("dev: wut?")
-
-    await this.rewardPool.connect(this.dev).dev(this.bob.address, { from: this.dev.address })
-
+    await expect(this.rewardPool.connect(this.bob).setDevAddr(this.bob.address, { from: this.bob.address })).to.be.revertedWith("Ownable: caller is not the owner")
+    await this.rewardPool.setDevAddr(this.bob.address)
     expect(await this.rewardPool.devaddr()).to.equal(this.bob.address)
+  })
 
-    await this.rewardPool.connect(this.bob).dev(this.alice.address, { from: this.bob.address })
+  it("Fee and its setter", async function () {
+    this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+    await this.rewardPool.deployed()
+    expect(await this.rewardPool.devFeePpm()).to.equal(0)
 
-    expect(await this.rewardPool.devaddr()).to.equal(this.alice.address)
+    await expect(this.rewardPool.connect(this.bob).setDevFee(this.bob.address, { from: this.bob.address })).to.be.revertedWith("Ownable: caller is not the owner")
+    await this.rewardPool.setDevFee(123456)
+    expect(await this.rewardPool.devFeePpm()).to.equal(123456)
   })
 
   context("With ERC/LP token added to the field", function () {
@@ -91,7 +94,7 @@ describe("EasySwapRewardPool", function () {
       expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
     })
 
-    it("should give out ESMs and ESGs at farming time", async function () {
+    it("should give out ESMs and ESGs at farming time w.o. fees", async function () {
       // 100 ESM and 10 ESG per block farming rate starting at block 100 and ending at block 199
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
       await this.rewardPool.deployed()
@@ -190,15 +193,47 @@ describe("EasySwapRewardPool", function () {
       expect(await this.esg.balanceOf(this.rewardPool.address)).to.equal("0")
       expect(await this.esm.balanceOf(this.bob.address)).to.equal("1200")
       expect(await this.esg.balanceOf(this.bob.address)).to.equal("600")
+    })
 
-      /* Fixme EZ-254 Reward pool out of period end with sub underflow
-      await this.rewardPool.setCurrentBlock("205")
-      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
-      expect(await this.rewardPool.pendingEsg(0, this.bob.address)).to.equal("0")
-      await this.rewardPool.connect(this.bob).deposit(0, "0")
-      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
-      expect(await this.rewardPool.pendingEsg(0, this.bob.address)).to.equal("0")
-      */
+    it("With 5% fees, single LP, single block, single stage", async function () {
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.setDevFee(50000) //5%
+      await this.rewardPool.addStage("100", "100", "1000" /*ESM per block*/, "2000" /*ESG per block*/)
+      await this.esm.transfer(this.rewardPool.address, 1000)
+      await this.esg.transfer(this.rewardPool.address, 2000)
+      expect((await this.rewardPool.getTotalEsxRewards("100","100"))[0]).to.equal("1000")
+      expect((await this.rewardPool.getTotalEsxRewards("100","100"))[1]).to.equal("2000")
+      await this.rewardPool.add("100", this.lp.address, true)
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
+      await this.rewardPool.connect(this.bob).deposit(0, "100")
+      await this.rewardPool.setCurrentBlock("101")
+      await this.rewardPool.connect(this.bob).withdraw(0, "100")
+      // Bob got all his LP tokens back ...
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
+      // ...plus ESM and ESG rewards
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal("950")
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("1900")
+    })
+
+    it("With 5% fees, single LP, two blocks, single stage", async function () {
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.setDevFee(50000) //5%
+      await this.rewardPool.addStage("100", "101", "1000" /*ESM per block*/, "2000" /*ESG per block*/)
+      await this.esm.transfer(this.rewardPool.address, 2000)
+      await this.esg.transfer(this.rewardPool.address, 4000)
+      expect((await this.rewardPool.getTotalEsxRewards("100","100"))[0]).to.equal("1000")
+      expect((await this.rewardPool.getTotalEsxRewards("100","100"))[1]).to.equal("2000")
+      await this.rewardPool.add("100", this.lp.address, true)
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
+      await this.rewardPool.connect(this.bob).deposit(0, "100")
+      await this.rewardPool.setCurrentBlock("102")
+      await this.rewardPool.connect(this.bob).withdraw(0, "100")
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal("1900")
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal("3800")
+      // Got all his LP tokens back
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
     })
 
     it("should not distribute ESMs if no one deposit", async function () {
@@ -366,8 +401,7 @@ describe("EasySwapRewardPool", function () {
       })
 
       it('addStage reverts if new endBlock less than start', async function () {
-        await expect(this.rewardPool.addStage("321", "320", "1", "1")).to.be.revertedWith("addStage: new endBlock should be more than startBlock")
-        await expect(this.rewardPool.addStage("321", "321", "1", "1")).to.be.revertedWith("addStage: new endBlock should be more than startBlock")
+        await expect(this.rewardPool.addStage("321", "320", "1", "1")).to.be.revertedWith("addStage: new endBlock shouldn't be less than startBlock")
       })
 
       it('stages are displayed correctly', async function () {
