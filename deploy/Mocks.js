@@ -11,7 +11,6 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
 
 module.exports.skip = ({ getChainId }) =>
   new Promise(async (resolve, reject) => {
-    console.log('here')
     try {
       const chainId = await getChainId()
       resolve(chainId !== "31337")
