@@ -231,6 +231,9 @@ contract EasySwapRewardPool is Ownable {
         view
         returns (uint256)
     {
+        if (totalAllocPoint == 0) {
+            return 0;
+        }
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accEsmPerShare = pool.accEsmPerShare;
@@ -248,6 +251,9 @@ contract EasySwapRewardPool is Ownable {
         view
         returns (uint256)
     {
+        if (totalAllocPoint == 0) {
+            return 0;
+        }
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accEsgPerShare = pool.accEsgPerShare;
@@ -270,6 +276,11 @@ contract EasySwapRewardPool is Ownable {
 
     // Enforce reward, update ESM and ESG shares for the given pool and pay devs fee
     function updatePool(uint256 _pid) public {
+        // require(totalAllocPoint != 0, "Can't update current pool (cause of TotalAllocPoints equals to 0)");
+        if (totalAllocPoint == 0) {
+            return;
+        }
+
         PoolInfo storage pool = poolInfo[_pid];
         if (_getCurrentBlock() <= pool.lastRewardBlock) {
             return;

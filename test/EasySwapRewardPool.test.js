@@ -1,6 +1,7 @@
 const { ethers } = require("hardhat")
 const { expect } = require("chai")
 const { BN } = require("bn.js")
+const expectEvent = require("@openzeppelin/test-helpers/src/expectEvent")
 
 describe("EasySwapRewardPool", function () {
   before(async function () {
@@ -94,6 +95,409 @@ describe("EasySwapRewardPool", function () {
       expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
     })
 
+
+    it("shouldn't crash when totalAllocPoint == 0. Scenario 1", async function () {
+
+      /*  Scenario 1:
+      - Create first LP pool with 0 allocPoints, and update=FALSE
+      - Create reward stage (example from block 123)
+      - Bob Makes dedposit
+      - Switching current block to make rewards (example 124)
+      - Check pending ESM -> it should be 0
+      - Set pool allocPOints to 0, and update=FALSE
+      - Check pending ESM -> it should be 0
+      */
+      
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+      
+
+      // Add LP token to the Reward Pool  with allocPoints = 0, update=false 
+      await this.rewardPool.add("0", this.lp.address, false)
+      let poolLength = await this.rewardPool.poolLength()
+      console.log("poolLength  ", poolLength)
+      let totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points', totalAP)
+
+      expect(poolLength).to.equal("1")
+      expect(totalAP).to.equal('0')
+
+      // Bob makes 'Deposit' for 100 LP tokens   
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Look at ESM rewards for Bob
+      let bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("0")
+
+    
+      // Change LP pool conditions: pool's allocPoints switch to 0
+      console.log('Switching allocPoints for pool #0 to 0: ')
+      await this.rewardPool.set(0, 0, false)   // false to crash
+      
+      totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points now:', totalAP)
+      expect(totalAP).to.equal("0")
+
+
+      // Look at ESM rewards for Bob after switching pool allocPoints to 0
+      console.log('If set withUpdate=false --> Here must be crash')
+      bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("0")
+
+    })
+
+    it("shouldn't crash when totalAllocPoint == 0. Scenario 2", async function () {
+
+      /*  Scenario 2:
+      - Create first LP pool with 1000 allocPoints, and update=FALSE
+      - Create reward stage (example from block 123)
+      - Bob Makes dedposit
+      - Switching current block to make rewards (example 124)
+      - Check pending ESM -> it should be > 60
+      - Set pool allocPOints to 0, and update=FALSE
+      - Check pending ESM -> it should be > 0
+      */
+      
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+      
+
+      // Add LP token to the Reward Pool with allocPoints = 1000, update=false 
+      await this.rewardPool.add("1000", this.lp.address, false)
+      let poolLength = await this.rewardPool.poolLength()
+      let totalAP = await this.rewardPool.totalAllocPoint()
+      expect(poolLength).to.equal("1")
+      expect(totalAP).to.equal('1000')
+
+      // Bob makes 'Deposit' for 100 LP tokens   
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Look at ESM rewards for Bob
+      let bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("60")
+
+    
+      // Change LP pool conditions: pool's allocPoints switch to 0
+      console.log('Switching allocPoints for pool #0 to 0: ')
+      await this.rewardPool.set(0, 0, false)   // false to crash
+      
+      totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points now:', totalAP)
+      expect(totalAP).to.equal("0")
+
+
+      // Look at ESM rewards for Bob after switching pool allocPoints to 0
+      console.log('If set withUpdate=false --> Here must be crash')
+      bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("0")
+
+    })
+
+    it("shouldn't crash when totalAllocPoint == 0. Scenario 3", async function () {
+
+      /*  Scenario 3:
+      - Create first LP pool with 1000 allocPoints, and update=TRUE
+      - Create reward stage (example from block 123)
+      - Bob Makes dedposit
+      - Switching current block to make rewards (example 124)
+      - Check pending ESM -> it should be > 60
+      - Set pool allocPOints to 0, and update=TRUE
+      - Check pending ESM -> it should be > 0
+      */
+      
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+
+      // Add LP token to the Reward Pool with allocPoints = 1000, update=false 
+      await this.rewardPool.add("1000", this.lp.address, true)
+      let poolLength = await this.rewardPool.poolLength()
+      let totalAP = await this.rewardPool.totalAllocPoint()
+      expect(poolLength).to.equal("1")
+      expect(totalAP).to.equal('1000')
+
+      // Bob makes 'Deposit' for 100 LP tokens   
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Look at ESM rewards for Bob
+      let bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("60")
+
+    
+      // Change LP pool conditions: pool's allocPoints switch to 0
+      console.log('Switching allocPoints for pool #0 to 0: ')
+      await this.rewardPool.set(0, 0, true)   // false to crash
+      
+      totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points now:', totalAP)
+      expect(totalAP).to.equal("0")
+
+
+      // Look at ESM rewards for Bob after switching pool allocPoints to 0
+      console.log('If set withUpdate=false --> Here must be crash')
+      bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("0")
+
+    })
+
+    it("shouldn't crash when totalAllocPoint == 0. Scenario 4", async function () {
+
+      /*  Scenario 4:
+      - Create first LP pool with 1000 allocPoints, and update=TRUE
+      - Create reward stage (example from block 123)
+      - Bob Makes dedposit
+      - Switching current block to make rewards (example 124)
+      - Check pending ESM -> it should be > 60
+      - Set pool allocPOints to 1, and update=FALSE
+      - Check pending ESM -> it should be > 60
+      */
+      
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+
+      // Add LP token to the Reward Pool with allocPoints = 1000, update=false 
+      await this.rewardPool.add("1000", this.lp.address, true)
+      let poolLength = await this.rewardPool.poolLength()
+      let totalAP = await this.rewardPool.totalAllocPoint()
+      expect(poolLength).to.equal("1")
+      expect(totalAP).to.equal('1000')
+
+      // Bob makes 'Deposit' for 100 LP tokens   
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Look at ESM rewards for Bob
+      let bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("60")
+
+    
+      // Change LP pool conditions: pool's allocPoints switch to 1
+      console.log('Switching allocPoints for pool #0 to 0: ')
+      await this.rewardPool.set(0, 1, false)   
+      
+      totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points now:', totalAP)
+      expect(totalAP).to.equal("1")
+
+
+      // Look at ESM rewards for Bob after switching pool allocPoints to 0
+      console.log('If set withUpdate=false --> Here must be crash')
+      bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("60")
+
+    })
+
+
+    it("shouldn't crash when totalAllocPoint == 0. Scenario 5", async function () {
+
+      /*  Scenario 5:
+      - Create first LP pool with 1000 allocPoints, and update=TRUE
+      - Create reward stage (example from block 123)
+      - Bob Makes dedposit
+      - Switching current block to make rewards (example 124)
+      - Check pending ESM -> it should be > 60
+      - Set pool allocPOints to 1, and update=TRUE
+      - Check pending ESM -> it should be > 120
+      */
+      
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+
+      // Add LP token to the Reward Pool with allocPoints = 1000, update=false 
+      await this.rewardPool.add("1000", this.lp.address, true)
+      let poolLength = await this.rewardPool.poolLength()
+      let totalAP = await this.rewardPool.totalAllocPoint()
+      expect(poolLength).to.equal("1")
+      expect(totalAP).to.equal('1000')
+
+      // Bob makes 'Deposit' for 100 LP tokens   
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Look at ESM rewards for Bob
+      let bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("60")
+
+    
+      // Change LP pool conditions: pool's allocPoints switch to 1
+      console.log('Switching allocPoints for pool #0 to 0: ')
+      await this.rewardPool.set(0, 1, true)   
+      
+      totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points now:', totalAP)
+      expect(totalAP).to.equal("1")
+
+
+      // Look at ESM rewards for Bob after switching pool allocPoints to 0
+      console.log('If set withUpdate=false --> Here must be crash')
+      bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("120")
+
+    })
+
+
+    it("shouldn't crash when totalAllocPoint == 0. Scenario 6", async function () {
+
+      /*  Scenario 6:
+      - Create first LP pool with 1000 allocPoints, and update=TRUE
+      - Create reward stage (example from block 123)
+      - Bob Makes dedposit
+      - Switching current block to make rewards (example 124)
+      - Check pending ESM -> it should be > 60
+      - Set pool allocPOints to 1, and update=TRUE
+      - Check pending ESM -> it should be > 120
+
+      - Create second LP pool with 2 allocPoints, and update = False
+      - Switching next current block to make rewards (example 125)
+
+      */
+      
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+
+      // Add LP token to the Reward Pool with allocPoints = 1000, update=false 
+      await this.rewardPool.add("1000", this.lp.address, true)
+      let poolLength = await this.rewardPool.poolLength()
+      let totalAP = await this.rewardPool.totalAllocPoint()
+      expect(poolLength).to.equal("1")
+      expect(totalAP).to.equal('1000')
+
+      // Bob makes 'Deposit' for 100 LP tokens   
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Look at ESM rewards for Bob
+      let bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("60")
+
+    
+      // Change LP pool conditions: pool's allocPoints switch to 1
+      console.log('Switching allocPoints for pool #0 to 0: ')
+      await this.rewardPool.set(0, 1, true)   
+      
+      totalAP = await this.rewardPool.totalAllocPoint()
+      console.log('Total alloc points now:', totalAP)
+      expect(totalAP).to.equal("1")
+
+
+      // Look at ESM rewards for Bob after switching pool allocPoints to 0
+      console.log('If set withUpdate=false --> Here must be crash')
+      bobsPendingEsmBalance = await this.rewardPool.pendingEsm(0, this.bob.address)
+      console.log("Bob's pending balance: ", bobsPendingEsmBalance)
+      expect(bobsPendingEsmBalance).to.equal("120")
+
+
+      // Add LP token to the Reward Pool with allocPoints = 2, update=true 
+      await this.rewardPool.add("2", this.lp2.address, true)
+      expect(await this.rewardPool.totalAllocPoint()).to.equal(3)
+
+      // Bob makes deposit to second pool
+      await this.lp2.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      await this.rewardPool.connect(this.bob).deposit(1, "200")
+      expect(await this.lp2.balanceOf(this.bob.address)).to.equal("800")
+
+      // switching reward block to next
+      await this.rewardPool.setCurrentBlock('125')
+
+      // check pending rewards:
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("140")
+      expect(await this.rewardPool.pendingEsm(1, this.bob.address)).to.equal('40')
+
+
+
+    })
+
+
+
+    //  -=-=-=-=-=-   WIP -=-=-=-=-=-=-
+    // it("should make proper event", async function () {
+
+    //   //  -=-=-=-=-=-=-=- MY EVENTS TESTS -=-=-=-=-=-=-
+
+    //   this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+    //   await this.rewardPool.deployed()
+    //   await this.rewardPool.addStage("123", "99999", "1" /*ESM per block*/, "1" /*ESG per block*/)
+    //   await this.rewardPool.add("0", this.lp.address, true)
+      
+    //   await this.rewardPool.pendingEsg(0, this.bob.address)
+
+    //   await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
+      
+    //   const depositTx = await this.rewardPool.connect(this.bob).deposit(0, "100")
+    //   await expect(depositTx).to.emit(this.rewardPool, "Deposit").withArgs(this.bob.address, 0, "100")
+      
+    //   // let depositReceipt = await depositTx.wait();
+    //   // console.log('My TX Receipt: ', depositReceipt)
+
+    //   expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+    //   const emergencyWithdrawTx = await this.rewardPool.connect(this.bob).emergencyWithdraw(0)
+    //   await expect(emergencyWithdrawTx).to.emit(this.rewardPool, 'EmergencyWithdraw').withArgs(this.bob.address, 0, '100')
+
+    //   expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
+
+    // })
+
+
+
+
+
+
     it("should give out ESMs and ESGs at farming time w.o. fees", async function () {
       // 100 ESM and 10 ESG per block farming rate starting at block 100 and ending at block 199
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
@@ -127,6 +531,7 @@ describe("EasySwapRewardPool", function () {
       await this.rewardPool.add("100", this.lp.address, true)
       await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
       await this.rewardPool.connect(this.bob).deposit(0, "100")
+      // console.log("depo2Tx: ", depo2Tx)
 
       await this.rewardPool.setCurrentBlock("90")
       expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
