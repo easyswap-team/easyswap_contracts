@@ -76,6 +76,48 @@ describe("EasySwapRewardPool", function () {
       await this.lp2.transfer(this.carol.address, "1000")
     })
 
+    it("shouldn't makes events with zero transfers", async function () {
+
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.addStage("121", "125", "10" /*ESM per block*/, "10" /*ESG per block*/)
+      await this.esm.transfer(this.rewardPool.address, 600)
+      await this.esg.transfer(this.rewardPool.address, 600)
+
+      await this.rewardPool.add("100", this.lp.address, true)
+
+      await this.rewardPool.setCurrentBlock('122')
+
+      // deposit
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
+      let depositTx = await this.rewardPool.connect(this.bob).deposit(0, "20")
+      let depositReceipt = await depositTx.wait()
+      expect(depositReceipt.events.length).to.equal(3)
+
+      // withdraw with rewards makes 4 events
+      await this.rewardPool.setCurrentBlock('126')
+      let withdrawTx = await this.rewardPool.connect(this.bob).withdraw(0, "11")
+      let withdrawReceipt = await withdrawTx.wait()
+      expect(withdrawReceipt.events.length).to.equal(4)
+
+      // blocks without rewards makes 2 events
+      await this.rewardPool.setCurrentBlock('128')
+      const withdrawTx2 = await this.rewardPool.connect(this.bob).withdraw(0, "9")
+      const withdrawReceipt2 = await withdrawTx2.wait()
+      expect(withdrawReceipt2.events.length).to.equal(2)
+
+
+      let depositTx2 = await this.rewardPool.connect(this.bob).deposit(0, "30")
+      let depositReceipt2 = await depositTx2.wait()
+      expect(depositReceipt2.events.length).to.equal(3)
+
+      // blocks without rewards makes 2 events
+      await this.rewardPool.setCurrentBlock('144')
+      const withdrawTx3 = await this.rewardPool.connect(this.bob).withdraw(0, "30")
+      const withdrawReceipt3 = await withdrawTx3.wait()
+      expect(withdrawReceipt3.events.length).to.equal(2)
+      })
+
     it("should allow emergency withdraw", async function () {
       // 100 per block farming rate starting at block 100 with bonus until block 1000
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
