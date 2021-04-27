@@ -131,6 +131,7 @@ contract EasySwapRewardPool is Ownable {
         uint256 lastRewardBlock =
             _getCurrentBlock() > stages[0].startBlock ? _getCurrentBlock() : stages[0].startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        require(totalAllocPoint != 0, "add: totalAllocPoint can't be 0");
         poolInfo.push(
             PoolInfo({
                 lpToken: _lpToken,
@@ -154,6 +155,7 @@ contract EasySwapRewardPool is Ownable {
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(
             _allocPoint
         );
+        require(totalAllocPoint != 0, "set: totalAllocPoint can't be 0");
         poolInfo[_pid].allocPoint = _allocPoint;
     }
 
@@ -231,9 +233,9 @@ contract EasySwapRewardPool is Ownable {
         view
         returns (uint256)
     {
-        if (totalAllocPoint == 0) {
-            return 0;
-        }
+        // if (totalAllocPoint == 0) {
+        //     return 0;
+        // }
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accEsmPerShare = pool.accEsmPerShare;
@@ -251,9 +253,9 @@ contract EasySwapRewardPool is Ownable {
         view
         returns (uint256)
     {
-        if (totalAllocPoint == 0) {
-            return 0;
-        }
+        // if (totalAllocPoint == 0) {
+        //     return 0;
+        // }
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accEsgPerShare = pool.accEsgPerShare;
@@ -277,9 +279,9 @@ contract EasySwapRewardPool is Ownable {
     // Enforce reward, update ESM and ESG shares for the given pool and pay devs fee
     function updatePool(uint256 _pid) public {
         // require(totalAllocPoint != 0, "Can't update current pool (cause of TotalAllocPoints equals to 0)");
-        if (totalAllocPoint == 0) {
-            return;
-        }
+        // if (totalAllocPoint == 0) {
+        //     return;
+        // }
 
         PoolInfo storage pool = poolInfo[_pid];
         if (_getCurrentBlock() <= pool.lastRewardBlock) {
