@@ -840,6 +840,53 @@ describe("EasySwapRewardPool", function () {
       })
     })
 
+
+    context('ESM and ESG reward', function () {
+        beforeEach(async function () {
+
+            this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+            await this.rewardPool.deployed()
+            await this.rewardPool.addStage("1", "100", "100", "10")
+            await this.esm.transfer(this.rewardPool.address, 1000)
+            await this.esg.transfer(this.rewardPool.address, 100)
+            await this.rewardPool.add("1", this.lp.address, true)
+            await this.lp.connect(this.carol).approve(this.rewardPool.address, "1000")
+
+        })
+
+        it("Should return zero ESM reward for zero deposit.", async function () {
+        //Deposit Carol is 0 and ESM reward is 0
+            await this.rewardPool.setCurrentBlock("1")
+            await this.rewardPool.connect(this.carol).deposit(0, "0", { from: this.carol.address })
+            await this.rewardPool.setCurrentBlock("20")
+
+            expect(await this.rewardPool.pendingEsm(0, this.carol.address)).to.equal("0")
+        })
+
+        it("Should return zero ESG reward for zero deposit.", async function () {
+        //Deposit Carol is 0 and ESG reward is 0
+            await this.rewardPool.setCurrentBlock("1")
+            await this.rewardPool.connect(this.carol).deposit(0, "0", { from: this.carol.address })
+            await this.rewardPool.setCurrentBlock("20")
+
+            expect(await this.rewardPool.pendingEsg(0, this.carol.address)).to.equal("0")
+        })
+
+        it("Should return zero ESM and ESG reward if deposit became zero.", async function () {
+        //Carol's deposit was not zero at first
+            await this.rewardPool.setCurrentBlock("1")
+            await this.rewardPool.connect(this.carol).deposit(0, "10", { from: this.carol.address })
+            await this.rewardPool.setCurrentBlock("2")
+            await this.rewardPool.connect(this.carol).withdraw(0, "10")
+            await this.rewardPool.setCurrentBlock("3")
+
+            expect(await this.rewardPool.pendingEsm(0, this.carol.address)).to.equal("0")
+            expect(await this.rewardPool.pendingEsg(0, this.carol.address)).to.equal("0")
+        })
+
+
+    })
+
     context('Esm emission scenario', function () {
       beforeEach(async function () {
         this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
