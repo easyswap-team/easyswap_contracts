@@ -287,8 +287,8 @@ contract EasySwapRewardPool is Ownable {
         // Calculate and pay ESM and ESG fees for developer's fund
         uint256 esmFee = esmReward.mul(devFeePpm).div(1e6);
         uint256 esgFee = esgReward.mul(devFeePpm).div(1e6);
-            safeEsxTransfer(esm, devaddr, esmFee);
-            safeEsxTransfer(esg, devaddr, esgFee);
+        safeEsxTransfer(esm, devaddr, esmFee);
+        safeEsxTransfer(esg, devaddr, esgFee);
 
         // Update shares for remaining ESM and ESG
         uint256 esmWithdrawable = esmReward.sub(esmFee);
@@ -314,12 +314,12 @@ contract EasySwapRewardPool is Ownable {
                 user.amount.mul(pool.accEsmPerShare).div(1e12).sub(
                     user.esmRewardDebt
                 );
-                safeEsxTransfer(esm, msg.sender, pending);
+            safeEsxTransfer(esm, msg.sender, pending);
 
             pending = user.amount.mul(pool.accEsgPerShare).div(1e12).sub(
                     user.esgRewardDebt
                 );
-                safeEsxTransfer(esg, msg.sender, pending);
+            safeEsxTransfer(esg, msg.sender, pending);
         }
         pool.lpToken.safeTransferFrom(
             address(msg.sender),
@@ -343,14 +343,14 @@ contract EasySwapRewardPool is Ownable {
             user.amount.mul(pool.accEsmPerShare).div(1e12).sub(
                 user.esmRewardDebt
             );
-            safeEsxTransfer(esm, msg.sender, pending);
+        safeEsxTransfer(esm, msg.sender, pending);
 
         // ESG payout
         pending =
             user.amount.mul(pool.accEsgPerShare).div(1e12).sub(
                 user.esgRewardDebt
             );
-            safeEsxTransfer(esg, msg.sender, pending);
+        safeEsxTransfer(esg, msg.sender, pending);
 
         user.amount = user.amount.sub(_amount);
         user.esmRewardDebt = user.amount.mul(pool.accEsmPerShare).div(1e12);
