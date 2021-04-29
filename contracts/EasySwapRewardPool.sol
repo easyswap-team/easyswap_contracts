@@ -280,7 +280,7 @@ contract EasySwapRewardPool is Ownable {
             return;
         }
         (uint256 totalEsmReward, uint256 totalEsgReward) =
-            getTotalEsxRewards(pool.lastRewardBlock, _getCurrentBlock());
+            getTotalEsxRewards(pool.lastRewardBlock.add(1), _getCurrentBlock());
         uint256 esmReward = totalEsmReward.mul(pool.allocPoint).div(totalAllocPoint);
         uint256 esgReward = totalEsgReward.mul(pool.allocPoint).div(totalAllocPoint);
 
