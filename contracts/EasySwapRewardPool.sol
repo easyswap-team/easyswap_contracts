@@ -379,11 +379,13 @@ contract EasySwapRewardPool is Ownable {
 
     // Safe tokenTransfer function, just in case if rounding error causes pool to not have enough balance
     function safeEsxTransfer(IERC20 _token, address _to, uint256 _amount) internal {
-        uint256 bal = _token.balanceOf(address(this));
-        if (_amount > bal) {
-            _token.transfer(_to, bal);
-        } else {
-            _token.transfer(_to, _amount);
+        if (_amount != 0) {
+            uint256 bal = _token.balanceOf(address(this));
+            if (_amount > bal) {
+                _token.transfer(_to, bal);
+            } else {
+                _token.transfer(_to, _amount);
+            }
         }
     }
 }
