@@ -813,6 +813,154 @@ describe("EasySwapRewardPool", function () {
       expect(await this.esg.balanceOf(this.bob.address)).to.equal(1800)
     })
 
+    it(`should distribute ESMs properly for each staker. 
+              Scenario 5: full three stages WITH FEE
+                          and add LP pool at stage #3`, async function() {
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.addStage("300", "310", "100", "100")
+      await this.rewardPool.addStage("311", "320", "50", "50")
+      await this.rewardPool.addStage("321", "330", "200", "200")
+      // TODO user must be warned: Wheneve somebody makes deposit or withdraws
+      //    user's pending will be decreased for fee amount
+      await this.rewardPool.setDevFee(50000) //5%
+      
+      // total ESM  1000 + 500 + 2000 = 3500,   additional 10ESM to check rigth balances in the end
+      await this.esm.transfer(this.rewardPool.address, 3510)
+      await this.esg.transfer(this.rewardPool.address, 3510)
+      // after transfer Alice has 6490 esm and esg tokens
+      expect(await this.esm.balanceOf(this.alice.address)).to.equal(10000 - 3510).to.equal(6490)
+      expect(await this.esg.balanceOf(this.alice.address)).to.equal(6490)
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal(0)
+      expect(await this.esg.balanceOf(this.bob.address)).to.equal(0)
+
+      await this.rewardPool.add("100", this.lp.address, true)
+      await this.lp.connect(this.alice).approve(this.rewardPool.address, "1000")
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
+      await this.lp2.connect(this.carol).approve(this.rewardPool.address, "1000")
+
+      // At block 280 (no rewards here)
+      await this.rewardPool.setCurrentBlock(280)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(0)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+      // Alice makes deposit 40 LP tokens
+      await this.rewardPool.connect(this.alice).deposit(0, 40)
+      
+      // At block 299, one step before reward
+      await this.rewardPool.setCurrentBlock(299)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(0)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+      
+      // At block 300 - first block of reward
+      await this.rewardPool.setCurrentBlock(300)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(0)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+      
+      // At block 301 - first rewards for participants
+      // Alice gets 100 pending
+      await this.rewardPool.setCurrentBlock(301)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(100)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+
+      // At block 305
+      // Bob makes deposit for 60 LP tokens
+      // Alice has 500 pending ESM - 5% fee  = 475
+      await this.rewardPool.setCurrentBlock(305)
+      await this.rewardPool.connect(this.bob).deposit(0, 60)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(475)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+      
+      // At block 310 (end of first stage)
+      // Alice gets pending (310-305)*100*(40/100) = 200, her total pending 475 + 200 = 675
+      // Bob gets pending (310-305)*100*(60/100) = 300
+      // so here 700 + 300 = 1000 ESM was distributed to pending
+      await this.rewardPool.setCurrentBlock(310)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(675)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(300)
+
+      // At block 311 (first block of second stage)
+      // Alice gets pending (311-310)*50(40/100) = 20, her total pending 675 + 20 = 695
+      // Bobs gets pending (311-310)*50(60/100) = 30, his total pending 300 + 30 = 330
+      await this.rewardPool.setCurrentBlock(311)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(695)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(330)
+
+      // At block 320 (end block of second stage)
+      // Alice gets pending (320-311)*50(40/100) = 180, her total pending 695 + 180 = 875
+      // Bobs gets pending (320-311)*50(60/100) = 270, his total pending 330 + 270 = 600
+      // So here (20 + 180) + (30 + 270) = 500 ESM was distributes to pending 
+      await this.rewardPool.setCurrentBlock(320)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(875)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(600)
+
+      // At block 321 (first block of third stage)
+      // Alice gets pending (321-320)*200(40/100) = 80, her total pending 875 + 80 = 955
+      // Bob gets pending (321-320)*200(60/100) = 120, his total pending 600 + 120 = 720
+      await this.rewardPool.setCurrentBlock(321)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(955)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(720)
+
+      
+      // At block 325           -=-=-=-=-=-=-=- some math here -=-=-=-=-=-=-=-
+      // new LP pool was added
+      // Alice gets pending (325-321)*200(40/100) = 320, her total pending 955 + 320 = 1275 
+      // 475 of 1275 is fee free  
+      // Bob gets pending (325-321)*200(60/100) = 480, his total pending 720 + 480 = 1200
+      await this.rewardPool.setCurrentBlock(325)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(1275)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(1200)
+      // When pair was added the Fee is calculate:
+      // Alice second fee: (1275 - 475) * 0.05 = 40.  So Alice pending now is 1275 - 40 = 1235
+      // Bob first fee: 1200 * 0.05 = 60.  So Bob pending now is 1200 - 60 = 1140
+      // total fee payed: 25+40+60
+      await this.rewardPool.add(300, this.lp2.address, true)
+      await this.rewardPool.connect(this.carol).deposit(1, 100)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(1235)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(1140)
+
+      // At block 330 (last block of third stage)
+      // Alice gets pending (330-325)*200*(40/100)*(100/400) = 100, her total pending 1235 + 100 = 1335
+      // Bob gets pending (330-325)*200*(60/100)*(100/400) = 150, her total pending 1140 + 150 = 1290
+      // Carol gets pending (330-325)*200*(100/100)*(300/400) = 750, her total pending 0 + 750 = 750
+      await this.rewardPool.setCurrentBlock(330)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(1335)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(1290)
+      expect(await this.rewardPool.pendingEsm(1, this.carol.address)).to.equal(750)
+
+      // At block 331 - no rewards here
+      await this.rewardPool.setCurrentBlock(331)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(1335)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(1290)
+      expect(await this.rewardPool.pendingEsm(1, this.carol.address)).to.equal(750)
+      
+      // At block 335 - no rewards here
+      await this.rewardPool.setCurrentBlock(335)
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(1335)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(1290)
+      expect(await this.rewardPool.pendingEsm(1, this.carol.address)).to.equal(750)
+
+      // Everyone makes wiwthdraw and pay fee from pending
+      // Alice has 1235 pending fee free. So she has to pay fee: (1335 - 1235)*0.05=5
+      // So Alice pending to payout 1335 - 5 = 1330. 
+      // Bob has 1140 pending fee free. So he has to pay fee: (1290-1140)*0.05=7
+      // So Bob pending to payout 1290 - 7 = 1283
+      // Carol has to pay fee: 750*0.05 = 37.  Her ESM balance should be 750-37=713
+      await this.rewardPool.connect(this.alice).withdraw(0, 40)
+      await this.rewardPool.connect(this.bob).withdraw(0, 60)
+      await this.rewardPool.connect(this.carol).withdraw(1, 100)
+      expect(await this.esm.balanceOf(this.alice.address)).to.equal(6490 + 1330)
+      expect(await this.esm.balanceOf(this.bob.address)).to.equal(1283)
+      expect(await this.esm.balanceOf(this.carol.address)).to.equal(713)
+
+      // no one has deposit
+      expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(0)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(0)
+
+      // ESM balance of rewardPool now 10 ESM:
+      expect(await this.esm.balanceOf(this.rewardPool.address)).to.equal(10)
+    })
+
     /*
     it("should give proper ESMs allocation to each pool", async function () {
       // 100 per block farming rate starting at block 400 with bonus until block 1000
