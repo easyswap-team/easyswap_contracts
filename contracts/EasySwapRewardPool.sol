@@ -131,6 +131,7 @@ contract EasySwapRewardPool is Ownable {
         uint256 lastRewardBlock =
             _getCurrentBlock() > stages[0].startBlock ? _getCurrentBlock() : stages[0].startBlock;
         totalAllocPoint = totalAllocPoint.add(_allocPoint);
+        require(totalAllocPoint != 0, "add: totalAllocPoint can't be 0");
         poolInfo.push(
             PoolInfo({
                 lpToken: _lpToken,
@@ -154,6 +155,7 @@ contract EasySwapRewardPool is Ownable {
         totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(
             _allocPoint
         );
+        require(totalAllocPoint != 0, "set: totalAllocPoint can't be 0");
         poolInfo[_pid].allocPoint = _allocPoint;
     }
 
@@ -377,11 +379,13 @@ contract EasySwapRewardPool is Ownable {
 
     // Safe tokenTransfer function, just in case if rounding error causes pool to not have enough balance
     function safeEsxTransfer(IERC20 _token, address _to, uint256 _amount) internal {
-        uint256 bal = _token.balanceOf(address(this));
-        if (_amount > bal) {
-            _token.transfer(_to, bal);
-        } else {
-            _token.transfer(_to, _amount);
+        if (_amount != 0) {
+            uint256 bal = _token.balanceOf(address(this));
+            if (_amount > bal) {
+                _token.transfer(_to, bal);
+            } else {
+                _token.transfer(_to, _amount);
+            }
         }
     }
 }

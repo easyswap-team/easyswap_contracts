@@ -1,6 +1,7 @@
 const { ethers } = require("hardhat")
 const { expect } = require("chai")
 const { BN } = require("bn.js")
+const { expectEvent, expectRevert } = require('@openzeppelin/test-helpers');
 
 describe("EasySwapRewardPool", function () {
   before(async function () {
@@ -155,6 +156,50 @@ describe("EasySwapRewardPool", function () {
       expect(await this.esg.balanceOf(this.bob.address)).to.equal(299)
     })
     
+
+    it("shouldn't makes events with zero transfers", async function () {
+
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.addStage("121", "125", "10" /*ESM per block*/, "10" /*ESG per block*/)
+      await this.esm.transfer(this.rewardPool.address, 600)
+      await this.esg.transfer(this.rewardPool.address, 600)
+
+      await this.rewardPool.add("100", this.lp.address, true)
+
+      await this.rewardPool.setCurrentBlock('122')
+
+      // deposit
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
+      let depositTx = await this.rewardPool.connect(this.bob).deposit(0, "20")
+      let depositReceipt = await depositTx.wait()
+      expect(depositReceipt.events.length).to.equal(3)
+
+      // withdraw with rewards makes 4 events
+      await this.rewardPool.setCurrentBlock('126')
+      let withdrawTx = await this.rewardPool.connect(this.bob).withdraw(0, "11")
+      let withdrawReceipt = await withdrawTx.wait()
+      expect(withdrawReceipt.events.length).to.equal(4)
+
+      // blocks without rewards makes 2 events
+      await this.rewardPool.setCurrentBlock('128')
+      const withdrawTx2 = await this.rewardPool.connect(this.bob).withdraw(0, "9")
+      const withdrawReceipt2 = await withdrawTx2.wait()
+      expect(withdrawReceipt2.events.length).to.equal(2)
+
+
+      let depositTx2 = await this.rewardPool.connect(this.bob).deposit(0, "30")
+      let depositReceipt2 = await depositTx2.wait()
+      expect(depositReceipt2.events.length).to.equal(3)
+
+      // blocks without rewards makes 2 events
+      await this.rewardPool.setCurrentBlock('144')
+      const withdrawTx3 = await this.rewardPool.connect(this.bob).withdraw(0, "30")
+      const withdrawReceipt3 = await withdrawTx3.wait()
+      expect(withdrawReceipt3.events.length).to.equal(2)
+      })
+
+
     it("should allow emergency withdraw", async function () {
       // 100 per block farming rate starting at block 100 with bonus until block 1000
       this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
@@ -171,6 +216,92 @@ describe("EasySwapRewardPool", function () {
       await this.rewardPool.connect(this.bob).emergencyWithdraw(0)
 
       expect(await this.lp.balanceOf(this.bob.address)).to.equal("1000")
+    })
+
+
+    it("should revert when totalAllocPoint equals 0, if ADDidng LP pair with 0 allocPoint", async function () {
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+      
+
+      // Add LP token to the Reward Pool  with allocPoints = 0, update=false 
+      await expect(this.rewardPool.add('0', this.lp.address, false)).to.be.revertedWith("add: totalAllocPoint can't be 0")
+      await expect(this.rewardPool.add('0', this.lp2.address, true)).to.be.revertedWith("add: totalAllocPoint can't be 0")
+
+    })
+
+    it("should revert when totalAllocPoint equals 0, if SETting LP pair with 0 allocPoint", async function () {
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+      
+      // Add LP tokens to the RewardPool, with allocPoint != 0
+      await this.rewardPool.add("10", this.lp.address, true)
+      await this.rewardPool.add("10", this.lp2.address, true)
+
+      expect(await this.rewardPool.totalAllocPoint()).to.equal('20')
+      expect(await this.rewardPool.poolLength()).to.equal('2')
+
+      // set first LPpool's allocPoints to zero, after trying to set second pool to zero and get revert
+      // regardless of value massUpdate (false or true)
+      await this.rewardPool.set(0, 0, false)
+      await expect(this.rewardPool.set(1, 0, true)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+      await expect(this.rewardPool.set(1, 0, false)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+
+      await this.rewardPool.set(0, 0, true)
+      await expect(this.rewardPool.set(1, 0, true)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+      await expect(this.rewardPool.set(1, 0, false)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+
+      // set second LPpool's allocPoints to zero, after trying to set first pool to zero and get revert
+      // regardless of the value massUpdate (false or true)
+      await this.rewardPool.set(0, 10, false)
+      await this.rewardPool.set(1, 0, false)
+
+      await expect(this.rewardPool.set(0, 0, true)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+      await expect(this.rewardPool.set(0, 0, false)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+
+      await this.rewardPool.set(1, 0, true)
+      await expect(this.rewardPool.set(0, 0, true)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+      await expect(this.rewardPool.set(0, 0, false)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+    })
+
+    it("should revert when totalAllocPoint == 0, if SETting LP pair with 0 allocPoint, with user deposit", async function () {
+      // deploying contract and adds Reward Stages
+      this.rewardPool = await this.EasySwapRewardPool.deploy(this.esm.address, this.esg.address, this.dev.address)
+      await this.rewardPool.deployed()
+      await this.rewardPool.addStage("123", "99999", "60" /*ESM per block*/, "60" /*ESG per block*/)
+      
+      await this.rewardPool.add("100", this.lp.address, true)
+
+      expect(await this.rewardPool.poolLength()).to.equal("1")
+      expect(await this.rewardPool.totalAllocPoint()).to.equal('100')
+
+      // Bob makes 'Deposit' for 100 LP tokens to fuerst pool
+      await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")    
+      await this.rewardPool.connect(this.bob).deposit(0, "100")
+      expect(await this.lp.balanceOf(this.bob.address)).to.equal("900")
+
+      // Time goes and became first reward block
+      await this.rewardPool.setCurrentBlock("124")
+
+      // Check ESM rewards for Bob
+      expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("60")
+      expect(await this.rewardPool.pendingEsg(0, this.bob.address)).to.equal("60")
+
+      // Add new LP pool with update and check ESM rewards
+      await this.rewardPool.add("100", this.lp2.address, true)
+      expect(await this.rewardPool.poolLength()).to.equal("2")
+      expect(await this.rewardPool.totalAllocPoint()).to.equal('200')
+
+      // SET first pool points to zero
+      await this.rewardPool.set(0, 0, true)
+
+      // Then trying to set second pool to zero and get revert
+      await expect(this.rewardPool.set(1, 0, false)).to.be.revertedWith("set: totalAllocPoint can't be 0")
+
     })
 
     it("should give out ESMs and ESGs at farming time w.o. fees", async function () {
@@ -216,6 +347,7 @@ describe("EasySwapRewardPool", function () {
       await this.rewardPool.add("100", this.lp.address, true)
       await this.lp.connect(this.bob).approve(this.rewardPool.address, "1000")
       await this.rewardPool.connect(this.bob).deposit(0, "100")
+      // console.log("depo2Tx: ", depo2Tx)
 
       await this.rewardPool.setCurrentBlock("90")
       expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal("0")
