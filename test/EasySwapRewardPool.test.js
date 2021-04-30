@@ -900,7 +900,7 @@ describe("EasySwapRewardPool", function () {
       expect(await this.rewardPool.pendingEsm(0, this.alice.address)).to.equal(955)
       expect(await this.rewardPool.pendingEsm(0, this.bob.address)).to.equal(720)
 
-      
+                            
       // At block 325           -=-=-=-=-=-=-=- some math here -=-=-=-=-=-=-=-
       // new LP pool was added
       // Alice gets pending (325-321)*200(40/100) = 320, her total pending 955 + 320 = 1275 
@@ -959,6 +959,13 @@ describe("EasySwapRewardPool", function () {
 
       // ESM balance of rewardPool now 10 ESM:
       expect(await this.esm.balanceOf(this.rewardPool.address)).to.equal(10)
+
+      // calculate gathering fee:
+      // Alice at blocks 305 - 25 ESM, at block 325 - 40 ESM, at block 335 - 5 ESM (total 70)
+      // Bob at block 325 - 60 ESM, at block 335 - 7 ESM
+      // Carol at block 335 - 37 ESM
+      // Total fee: 25 + 40 + 5 + 60 + 7 + 37
+      expect(await this.esm.balanceOf(this.dev.address)).to.equal(25 + 40 + 5 + 60 + 7 + 37)
     })
 
     /*
